@@ -1,0 +1,46 @@
+# AII sidecar — InstituteOS metadata. Schema: instituteos.platform.aii_sidecar
+meta:
+  updated: '2026-06-30'
+repo:
+  name: pymdp
+  slug: pymdp
+  full_name: ActiveInferenceInstitute/pymdp
+  description: A Python implementation of active inference for Markov Decision Processes
+  default_branch: master
+institute:
+  category: research-software
+  steward: Active Inference Institute
+ecosystem:
+  links:
+    github: https://github.com/ActiveInferenceInstitute/pymdp
+    website: https://www.activeinference.org
+artifacts:
+- path: README.md
+  kind: doc
+  description: Repository overview.
+- path: pyproject.toml
+  kind: code
+  description: Python package config.
+- path: LICENSE
+  kind: doc
+  description: License.
+provenance:
+  license: MIT
+  citation:
+    doi: 10.21105/joss.04098
+instituteos:
+  tags:
+  - pymdp
+  - python
+  - implementation
+  - inference
+  - markov
+capabilities:
+- python-package
+- tested
+- notebooks
+- dataset
+tasks:
+  test:
+    cmd: python -m pytest
+    description: Run the test suite.
