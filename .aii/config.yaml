@@ -11,6 +11,12 @@ institute:
   category: research-software
   steward: Active Inference Institute
 ecosystem:
+  relations:
+  - repo: ActiveInferenceInstitute/InstituteOS
+    relation: referenced-by
+    note: Federated via the InstituteOS .aii manifest.
+  - repo: ActiveInferenceInstitute/Active_Inference_Ontology
+    note: Uses Active Inference Ontology terms.
   links:
     github: https://github.com/ActiveInferenceInstitute/pymdp
     website: https://www.activeinference.org
