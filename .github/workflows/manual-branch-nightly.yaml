@@ -6,7 +6,8 @@ on:
       ref:
         description: Branch, tag, or SHA to validate
         required: true
-        default: main
+        # FORK-LOCAL: this fork's default branch is `master`, not upstream's `main`.
+        default: master
         type: string
       python_version:
         description: Python version to use

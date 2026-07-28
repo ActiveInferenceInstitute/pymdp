@@ -1,8 +1,13 @@
 name: Nightly Tests
 
+# FORK-LOCAL DIVERGENCE (ActiveInferenceInstitute/pymdp).
+# The nightly schedule is intentionally disabled on this fork. Upstream
+# (infer-actively/pymdp) runs this same ~2h suite green every night against
+# `main`; this fork's only delta is metadata (.aii sidecar, LICENSE), which
+# cannot affect test outcomes, so a scheduled run here is pure duplication.
+# Re-enable by restoring the `schedule:` block below if the fork ever carries
+# code changes of its own. Manual runs remain available via workflow_dispatch.
 on:
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,9 +22,11 @@ jobs:
       matrix:
         python-version: ["3.14"]
     steps:
+      # FORK-LOCAL: upstream pins `ref: main`, but this fork's default branch is
+      # `master` and no `main` branch exists here -- that pin made checkout fail
+      # (exit 1) before any test ran. Omitting `ref` checks out the dispatched
+      # branch, so manual runs work on this fork.
       - uses: actions/checkout@v4
-        with:
-          ref: main
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
