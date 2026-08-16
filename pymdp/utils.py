@@ -44,7 +44,11 @@ def norm_dist(dist: Array) -> Array:
     Array
         Normalized distribution.
     """
-    return dist / dist.sum(0)
+    denominator = dist.sum(0)
+    safe_denominator = jnp.where(denominator == 0, 1.0, denominator)
+    normalized = dist / safe_denominator
+    uniform = jnp.ones_like(dist) / dist.shape[0]
+    return jnp.where(denominator == 0, uniform, normalized)
 
 def list_array_norm_dist(dist_list: list[Array]) -> list[Array]:
     """Normalizes a list of Categorical probability distributions.

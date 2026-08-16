@@ -21,6 +21,7 @@ from pymdp.algos import (
     hmm_smoother_from_filtered_colstoch,
 )
 from pymdp.maths import calc_vfe
+from pymdp import utils
 from jax import tree_util as jtu, lax
 from jax.experimental.sparse._base import JAXSparse
 from jax.experimental import sparse
@@ -180,6 +181,9 @@ def _run_one_step_inference(
 ) -> tuple[list[Array], list[Array] | Array]:
     curr_obs = _select_current_obs(obs, distr_obs)
     fpi_num_iter = 1 if method == EXACT_METHOD else num_iter
+    A_dependencies = utils.resolve_a_dependencies(
+        len(prior), len(A), A_dependencies
+    )
     qs = run_factorized_fpi(
         A,
         curr_obs,

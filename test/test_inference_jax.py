@@ -11,12 +11,30 @@ import numpy as np
 from jax import numpy as jnp, random as jr
 
 from pymdp.algos import run_vanilla_fpi as fpi_jax
+from pymdp.inference import update_posterior_states
 from pymdp.utils import random_factorized_categorical, random_A_array
 
 from pymdp.legacy.algos import run_vanilla_fpi as fpi_numpy
 from pymdp.legacy import utils
 
 class TestInferenceJax(unittest.TestCase):
+
+    def test_multifactor_inference_resolves_default_dependencies(self):
+        A = [jnp.ones((2, 2, 2)) / 2.0]
+        B = [
+            jnp.stack([jnp.eye(2), jnp.eye(2)], axis=-1),
+            jnp.stack([jnp.eye(2), jnp.eye(2)], axis=-1),
+        ]
+        obs = [jnp.array([1.0, 0.0])]
+        prior = [jnp.array([0.5, 0.5]), jnp.array([0.5, 0.5])]
+
+        result = update_posterior_states(
+            A, B, obs, None, prior=prior, method="fpi"
+        )
+
+        self.assertEqual(len(result), 2)
+        for factor in result:
+            self.assertTrue(bool(jnp.all(jnp.isfinite(factor))))
 
     def test_fixed_point_iteration_singlestate_singleobs(self):
         """
