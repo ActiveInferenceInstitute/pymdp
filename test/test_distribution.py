@@ -104,7 +104,7 @@ class TestDists(unittest.TestCase):
         self.assertEqual(model.B[1].data.shape, (2, 2, 2))
         self.assertEqual(model.A[0].data.shape, (10, 3))
         self.assertEqual(model.A[1].data.shape, (2, 3))
-        self.assertIsNotNone
+        self.assertIsNotNone(model.A)
         self.assertIsNotNone(model.A[0][:, "II"])
         self.assertIsNotNone(model.A[1][1, :])
         self.assertIsNotNone(model.B_action_dependencies)
