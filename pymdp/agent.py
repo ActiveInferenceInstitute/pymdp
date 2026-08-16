@@ -176,6 +176,10 @@ class Agent(Module):
 
         if B_action_dependencies is not None:
             assert num_controls is not None, "Please specify num_controls if you're also using complex action dependencies"
+            if sampling_mode != "full":
+                raise ValueError(
+                    "Complex B action dependencies require sampling_mode='full'"
+                )
 
         if learn_A:
             assert pA is not None, "pA is required for A learning"
