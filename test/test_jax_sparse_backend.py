@@ -76,6 +76,31 @@ def make_model_configs(source_seed=0, num_models=4) -> Dict:
 
 class TestJaxSparseOperations(unittest.TestCase):
 
+    def test_sparse_b_agent_fpi(self):
+        """Sparse B survives Agent construction and matches dense FPI inference."""
+        from pymdp.agent import Agent
+
+        V = 64
+        data = jnp.ones(V, dtype=jnp.float32)
+        indices = jnp.stack(
+            [jnp.arange(V), jnp.arange(V), jnp.zeros(V, dtype=int)], axis=1
+        )
+        sparse_b = sparse.BCOO((data, indices), shape=(V, V, 1))
+        dense_b = np.eye(V, dtype=np.float32)[:, :, np.newaxis]
+        A = [np.eye(V, dtype=np.float32)]
+        D = [np.ones(V, dtype=np.float32) / V]
+        dense_agent = Agent(A=A, B=[dense_b], D=D, batch_size=1)
+        sparse_agent = Agent(A=A, B=[sparse_b], D=D, batch_size=1)
+        prior_dense = [jnp.array(dense_agent.D[0])]
+        prior_sparse = [jnp.array(sparse_agent.D[0])]
+        for obs_value in [0, 5, 12, 30]:
+            qs_dense = dense_agent.infer_states([jnp.array([obs_value])], prior_dense)
+            qs_sparse = sparse_agent.infer_states([jnp.array([obs_value])], prior_sparse)
+            np.testing.assert_allclose(qs_dense[0], qs_sparse[0], atol=1e-6)
+            prior_dense = dense_agent.update_empirical_prior(jnp.array([[0]]), qs_dense)
+            prior_sparse = sparse_agent.update_empirical_prior(jnp.array([[0]]), qs_sparse)
+            np.testing.assert_allclose(prior_dense[0], prior_sparse[0], atol=1e-6)
+
     def test_sparse_smoothing(self):
         cfg = {"source_seed": 1, "num_models": 4}
         gm_params = make_model_configs(**cfg)
