@@ -115,7 +115,8 @@ def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "ten
     """
 
     if isinstance(tensor, sparse.BCOO):
-        sums = sparse.sparsify(jnp.sum)(tensor, axis=axis).todense()
+        res = sparse.sparsify(jnp.sum)(tensor, axis=axis)
+        sums = res.todense() if hasattr(res, "todense") else res
     else:
         sums = jnp.sum(tensor, axis=axis)
 
