@@ -6,7 +6,18 @@
 from pymdp.maths import multidimensional_outer, dirichlet_expected_value
 from jax.tree_util import tree_map
 from jaxtyping import Array
-from jax import vmap, nn, lax
+from jax import vmap, nn, lax, numpy as jnp
+
+def _mask_support(arr: Array, support_mask: Array | None, event_dim: int = 0) -> Array:
+    """Zero out unsupported entries and renormalize over event_dim."""
+    if support_mask is None:
+        return arr
+    is_supported = support_mask > 0
+    masked = jnp.where(is_supported, arr, 0.0)
+    denom = masked.sum(axis=event_dim, keepdims=True)
+    safe_denom = jnp.where(denom == 0, 1.0, denom)
+    return jnp.asarray(masked / safe_denom)
+
 
 def update_obs_likelihood_dirichlet_m(
     pA_m: Array,
@@ -57,7 +68,11 @@ def update_obs_likelihood_dirichlet_m(
         dfda = dfda * (support_mask > 0)
 
     new_pA_m = pA_m + lr * dfda
-    A_m = dirichlet_expected_value(new_pA_m)
+    if support_mask is not None:
+        new_pA_m = jnp.where(support_mask > 0, new_pA_m, 0.0)
+    A_m = jnp.asarray(dirichlet_expected_value(new_pA_m))
+    if support_mask is not None:
+        A_m = _mask_support(A_m, support_mask, event_dim=0)
 
     return new_pA_m, A_m
     
@@ -181,8 +196,14 @@ def update_state_transition_dirichlet_f(
     if support_mask is not None:
         dfdb = dfdb * (support_mask > 0)
     qB_f = pB_f + lr * dfdb
+    if support_mask is not None:
+        qB_f = jnp.where(support_mask > 0, qB_f, 0.0)
 
-    return qB_f, dirichlet_expected_value(qB_f)
+    E_qB_f = jnp.asarray(dirichlet_expected_value(qB_f))
+    if support_mask is not None:
+        E_qB_f = _mask_support(E_qB_f, support_mask, event_dim=0)
+
+    return qB_f, E_qB_f
 
 def update_state_transition_dirichlet(
     pB: list[Array],

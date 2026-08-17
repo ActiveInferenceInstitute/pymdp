@@ -28,12 +28,33 @@ class TestInferenceJax(unittest.TestCase):
         obs = [jnp.array([1.0, 0.0])]
         prior = [jnp.array([0.5, 0.5]), jnp.array([0.5, 0.5])]
 
-        result = update_posterior_states(
+        # 1. FPI one-step
+        result_fpi = update_posterior_states(
             A, B, obs, None, prior=prior, method="fpi"
         )
+        self.assertEqual(len(result_fpi), 2)
+        assert isinstance(result_fpi, list)
+        for factor in result_fpi:
+            self.assertTrue(bool(jnp.all(jnp.isfinite(factor))))
 
-        self.assertEqual(len(result), 2)
-        for factor in result:
+        # 2. Sequence inference (MMP & VMP) with omitted A/B dependencies
+        seq_obs = [jnp.array([[1.0, 0.0], [0.0, 1.0]])]
+        past_actions = jnp.array([[0, 0]])
+
+        result_mmp = update_posterior_states(
+            A, B, seq_obs, past_actions, prior=prior, method="mmp"
+        )
+        self.assertEqual(len(result_mmp), 2)
+        assert isinstance(result_mmp, list)
+        for factor in result_mmp:
+            self.assertTrue(bool(jnp.all(jnp.isfinite(factor))))
+
+        result_vmp = update_posterior_states(
+            A, B, seq_obs, past_actions, prior=prior, method="vmp"
+        )
+        self.assertEqual(len(result_vmp), 2)
+        assert isinstance(result_vmp, list)
+        for factor in result_vmp:
             self.assertTrue(bool(jnp.all(jnp.isfinite(factor))))
 
     def test_fixed_point_iteration_singlestate_singleobs(self):

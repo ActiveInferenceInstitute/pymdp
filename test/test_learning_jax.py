@@ -36,7 +36,8 @@ class TestLearningJax(unittest.TestCase):
         obs = [jnp.array([[1.0, 0.0]])]
         qs = [jnp.array([[0.25, 0.75]])]
 
-        qA, _ = update_pA_jax(
+        # First update
+        qA, E_qA = update_pA_jax(
             pA,
             A,
             obs,
@@ -47,7 +48,24 @@ class TestLearningJax(unittest.TestCase):
             lr=1.0,
         )
 
-        self.assertTrue(np.allclose(qA[0], jnp.array([[1.25, 1.0], [1.0, 1.0]])))
+        assert qA[0] is not None
+        self.assertTrue(np.allclose(qA[0], jnp.array([[1.25, 0.0], [0.0, 1.0]])))
+        self.assertTrue(np.allclose(E_qA[0], jnp.array([[1.0, 0.0], [0.0, 1.0]])))
+
+        # Second update passing back the returned expected matrix
+        qA_2, E_qA_2 = update_pA_jax(
+            qA,
+            E_qA,
+            obs,
+            qs,
+            A_dependencies=[[0]],
+            categorical_obs=True,
+            num_obs=[2],
+            lr=1.0,
+        )
+        assert qA_2[0] is not None
+        self.assertTrue(np.allclose(qA_2[0], jnp.array([[1.50, 0.0], [0.0, 1.0]])))
+        self.assertTrue(np.allclose(E_qA_2[0], jnp.array([[1.0, 0.0], [0.0, 1.0]])))
 
     def test_modern_transition_learning_preserves_structural_zero_support(self):
         B = [jnp.array([[[1.0], [0.0]], [[0.0], [1.0]]])]
@@ -55,12 +73,27 @@ class TestLearningJax(unittest.TestCase):
         joint = [jnp.array([[[1.0, 0.0], [0.0, 0.0]]])]
         actions = jnp.array([[0]])
 
-        qB, _ = update_pB_jax(
+        # First update
+        qB, E_qB = update_pB_jax(
             pB, B, joint, actions, num_controls=[1], lr=1.0
         )
 
         np.testing.assert_allclose(
-            qB[0], jnp.array([[[2.0], [1.0]], [[1.0], [1.0]]])
+            qB[0], jnp.array([[[2.0], [0.0]], [[0.0], [1.0]]])
+        )
+        np.testing.assert_allclose(
+            E_qB[0], jnp.array([[[1.0], [0.0]], [[0.0], [1.0]]])
+        )
+
+        # Second update passing back returned expected B
+        qB_2, E_qB_2 = update_pB_jax(
+            qB, E_qB, joint, actions, num_controls=[1], lr=1.0
+        )
+        np.testing.assert_allclose(
+            qB_2[0], jnp.array([[[3.0], [0.0]], [[0.0], [1.0]]])
+        )
+        np.testing.assert_allclose(
+            E_qB_2[0], jnp.array([[[1.0], [0.0]], [[0.0], [1.0]]])
         )
 
     def test_update_observation_likelihood_fullyconnected(self):

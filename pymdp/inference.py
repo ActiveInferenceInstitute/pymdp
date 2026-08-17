@@ -417,6 +417,17 @@ def update_posterior_states(
     if return_info and prior is None:
         raise ValueError("`prior` must be provided when `return_info=True`")
 
+    # Resolve default dependencies early so all methods and sequence inference receive complete mappings
+    num_factors = len(B) if B is not None else (len(prior) if prior is not None else 1)
+    num_modalities = len(A)
+    A_dependencies = utils.resolve_a_dependencies(
+        num_factors, num_modalities, A_dependencies
+    )
+    if B is not None:
+        B_dependencies = utils.resolve_b_dependencies(
+            num_factors, B_dependencies
+        )
+
     if method in SEQUENCE_METHODS:
         obs, past_actions = _truncate_for_horizon(obs, past_actions, inference_horizon)
 

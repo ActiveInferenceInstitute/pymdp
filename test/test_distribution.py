@@ -130,4 +130,18 @@ class TestDists(unittest.TestCase):
             dist.data = np.ones((len(locations), len(locations)))
         except ValueError:
             self.fail("Setting tensor with the same shape should not raise a ValueError")
+
+    def test_distribution_normalize_preserves_numpy_mutation(self):
+        """Test that Distribution.normalize() leaves the underlying data as mutable NumPy array."""
+        locations = ["here", "there"]
+        data = np.array([[1.0, 2.0], [3.0, 2.0]])
+        dist = distribution.Distribution({"location": locations}, {"location": locations}, data)
+        dist.normalize()
+        self.assertIsInstance(dist.data, np.ndarray)
+        np.testing.assert_allclose(dist.data.sum(axis=0), [1.0, 1.0])
+
+        # Verify in-place item / slice mutation succeeds
+        dist["here", "here"] = 0.8
+        self.assertAlmostEqual(float(dist["here", "here"]), 0.8)
+        self.assertIsInstance(dist.data, np.ndarray)
       

@@ -46,16 +46,34 @@ class TestAgentJax(unittest.TestCase):
         with self.assertRaises(ValueError):
             Agent(A, B, action_selection="invalid")
 
-    def test_agent_rejects_marginal_sampling_with_complex_actions(self):
+    def test_agent_accepts_canonical_action_dependencies_with_marginal_sampling(self):
         A = [jnp.eye(2)]
         B = [jnp.stack([jnp.eye(2), jnp.eye(2)], axis=-1)]
+
+        agent = Agent(
+            A,
+            B,
+            B_action_dependencies=[[0]],
+            num_controls=[2],
+            sampling_mode="marginal",
+        )
+        self.assertEqual(agent.sampling_mode, "marginal")
+
+    def test_agent_rejects_marginal_sampling_with_complex_actions(self):
+        A = [jnp.eye(2), jnp.eye(2)]
+        B = [
+            jnp.zeros((2, 2, 2, 2)),
+            jnp.zeros((2, 2, 2)),
+        ]
+        # Factor 0 depends on actions from factors 0 and 1
+        B_action_dependencies = [[0, 1], [1]]
 
         with self.assertRaisesRegex(ValueError, "sampling_mode='full'"):
             Agent(
                 A,
                 B,
-                B_action_dependencies=[[0]],
-                num_controls=[2],
+                B_action_dependencies=B_action_dependencies,
+                num_controls=[2, 2],
                 sampling_mode="marginal",
             )
 
