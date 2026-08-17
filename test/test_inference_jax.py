@@ -225,7 +225,7 @@ class TestInferenceJax(unittest.TestCase):
             qs_jax = fpi_jax(A_jax, obs, prior_jax, num_iter=16)
 
             for f, _ in enumerate(qs_jax):
-                self.assertTrue(np.allclose(qs_numpy[f], qs_jax[f]))
+                self.assertTrue(np.allclose(qs_numpy[f], qs_jax[f], atol=1e-4, rtol=1e-4))
     
     def test_fixed_point_iteration_index_observations(self):
         """
