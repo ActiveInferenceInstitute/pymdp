@@ -131,6 +131,28 @@ For new users to `pymdp`, we specifically recommend stepping through following t
 
 We also have (and are continuing to build) a series of notebooks that walk through active inference agents performing different types of tasks in the [Notebook Gallery](https://pymdp-rtd.readthedocs.io/en/latest/tutorials/notebooks/).
 
+## Publishing models as Generalized Notation Notation (GNN)
+
+`pymdp` generative models can be published as [Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation) (GNN) specifications — the plain-text language for Active Inference generative models — and validated against the real GNN parser pinned at GNN v5.0.3 (revision `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`):
+
+```python
+from pymdp import gnn
+
+spec = gnn.to_gnn_spec(agent, name="three_state_agent")  # GNN Markdown text
+path = gnn.write_gnn_spec("three_state_agent.gnn.md", agent, name="three_state_agent")
+
+report = gnn.validate_gnn_spec(agent, path)  # needs PYMDP_GNN_ROOT; see the guide
+assert report.ok, report.describe()
+```
+
+`validate_gnn_spec` re-parses the emitted file with the pinned GNN parser and compares every matrix, declared dimension and model parameter against the source arrays; GNN can then render and execute the specification through its own pymdp route. The [GNN interoperability guide](docs-mkdocs/guides/gnn-interoperability.md) documents the pinned-tree export, the round trip through GNN's renderer and executor, and the model class the bridge covers.
+
+Other repositories that specify or consume models in GNN:
+
+- [`active_inference_battleship`](https://github.com/ActiveInferenceInstitute/active_inference_battleship) — a playable model specified in GNN and compiled at build time.
+- [`active_inference_language_model`](https://github.com/ActiveInferenceInstitute/active_inference_language_model) — a language-model stack with GNN specifications and conformance checks.
+- [`ActiveBlockference`](https://github.com/ActiveInferenceInstitute/ActiveBlockference) and [`ActInf_RxInfer`](https://github.com/ActiveInferenceInstitute/ActInf_RxInfer) — block-based and RxInfer implementations in the same ecosystem.
+
 ## Contributing
 
 This package is under active development. If you would like to contribute, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).

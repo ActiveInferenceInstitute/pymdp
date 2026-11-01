@@ -2,8 +2,10 @@ name: Docs
 
 on:
   push:
+    # FORK-LOCAL: this fork's default branch is `master`; upstream uses `main`.
     branches:
       - main
+      - master
     paths:
       - 'examples/**'
       - 'mkdocs.yml'
