@@ -85,6 +85,15 @@ modelfit = [
     "pybefit",
 ]
 
+gnn = [
+    # Runtime dependencies of the pinned Generalized Notation Notation parser
+    # and pymdp executor used by `pymdp.gnn` validation and the opt-in
+    # integration test in `test/test_gnn_bridge.py`. The GNN source tree itself
+    # stays external: point PYMDP_GNN_ROOT at an exported pinned tree.
+    "defusedxml>=0.7.1",
+    "psutil>=5.8.0",
+]
+
 [project.urls]
 Documentation = "https://pymdp-rtd.readthedocs.io/en/latest/"
 Repository = "https://github.com/infer-actively/pymdp"

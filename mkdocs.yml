@@ -54,6 +54,7 @@ nav:
       - Using rollout() for compiled active inference loops: guides/rollout-active-inference-loop.md
       - PymdpEnv and Custom Environments: guides/pymdp-env.md
       - Generative Model Structure: guides/generative-model-structure.md
+      - Publishing Models as GNN Specifications: guides/gnn-interoperability.md
   - Migration:
       - NumPy/legacy to JAX: migration/numpy-to-jax.md
   - Tutorials:

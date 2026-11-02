@@ -120,3 +120,11 @@ At each step:
 
 For end-to-end loops, combine this mental model with the
 [`rollout()` guide](rollout-active-inference-loop.md).
+
+## Publishing the model as a GNN specification
+
+Once a model is built, it can be published as a plain-text Generalized Notation
+Notation specification: `pymdp.gnn` renders a flat (single-modality,
+single-factor) model as a `.gnn.md` file and validates it against the pinned
+GNN parser. See
+[Publishing models as GNN specifications](gnn-interoperability.md).
