@@ -145,7 +145,7 @@ report = gnn.validate_gnn_spec(agent, path)  # needs PYMDP_GNN_ROOT; see the gui
 assert report.ok, report.describe()
 ```
 
-`validate_gnn_spec` re-parses the emitted file with the pinned GNN parser and compares every matrix, declared dimension and model parameter against the source arrays; GNN can then render and execute the specification through its own pymdp route. The [GNN interoperability guide](docs-mkdocs/guides/gnn-interoperability.md) documents the pinned-tree export, the round trip through GNN's renderer and executor, and the model class the bridge covers.
+`validate_gnn_spec` re-parses the emitted file with the pinned GNN parser and compares every matrix, declared dimension and model parameter against the source arrays; GNN can then render and execute the specification through its own pymdp route. The [GNN interoperability guide](docs-mkdocs/guides/gnn-interoperability.md) documents the pinned-tree export, the round trip through GNN's renderer and executor, and the model class the bridge covers. GNN also maintains a [downstream adoption guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md) for repositories that consume it.
 
 Other repositories that specify or consume models in GNN:
 

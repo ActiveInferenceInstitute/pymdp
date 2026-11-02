@@ -197,6 +197,29 @@ class TestFPI(unittest.TestCase):
         
         self.assertTrue(np.isclose(qs_out[1], prior[1]).all())
 
+    def test_dot_likelihood_squeezes_only_axis_zero(self):
+        """
+        Likelihoods keep a trailing singleton axis.
+
+        Regression test for #405: `dot_likelihood` squeezed every size-1 axis, so
+        an `A` of shape `(num_obs, num_states, 1)` produced a likelihood of shape
+        `(num_states,)` instead of `(num_states, 1)`, which made the downstream
+        free-energy terms in the FPI loop inconsistent. Only axis 0 may be
+        squeezed, which is the observation axis that `dot_likelihood` sums over.
+        """
+
+        A = np.expand_dims(np.eye(25), axis=-1)  # (num_obs, num_states, 1)
+        obs = np.eye(1, 25).flatten()  # one-hot observation, outcome 0
+
+        likelihood = maths.dot_likelihood(A, obs)
+        self.assertEqual(likelihood.shape, (25, 1))
+        np.testing.assert_allclose(likelihood, np.eye(25)[[0]].T)
+
+        # the 2-D likelihood family keeps its historical shape
+        flat_likelihood = maths.dot_likelihood(np.eye(25), obs)
+        self.assertEqual(flat_likelihood.shape, (25,))
+        np.testing.assert_allclose(flat_likelihood, np.eye(25)[:, 0])
+
 
 if __name__ == "__main__":
     unittest.main()

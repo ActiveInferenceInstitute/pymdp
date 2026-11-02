@@ -144,6 +144,10 @@ GNN at the pinned revision:
 - [GNN syntax specification](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1/docs/gnn/gnn_syntax.md)
 - [PyMDP implementation guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1/docs/gnn/implementations/pymdp.md)
 
+Newer than the pinned revision, on GNN `main`:
+
+- [Downstream adoption: using GNN in a sibling repository](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md) — the surfaces a sibling repository consumes, including the parser and the extractor this bridge uses.
+
 Other repositories that consume or specify models in GNN:
 
 - [`active_inference_battleship`](https://github.com/ActiveInferenceInstitute/active_inference_battleship) — playable model specified in GNN and compiled at build time.
