@@ -9,10 +9,21 @@ This repository is a tracked fork of
 [`infer-actively/pymdp`](https://github.com/infer-actively/pymdp). `origin` is
 `ActiveInferenceInstitute/pymdp` and `master` is the fork's default branch.
 Fork-local changes stay additive so that merges from `upstream/main` remain
-clean: the fork delta today is the `.aii` InstituteOS sidecar, `TASKS.md`, and
-two fork-local CI comments (`manual-branch-nightly.yaml`,
-`nightly-tests.yaml`). Never rewrite upstream code paths to make a fork-local
-feature fit.
+clean: the fork delta is the `.aii` InstituteOS sidecar, `TASKS.md`, the two
+fork-local nightly workflows, the `master` entries in the three CI branch
+lists, and the GNN bridge. Never rewrite upstream code paths to make a
+fork-local feature fit.
+
+## Upstream sync
+
+`upstream` points at `infer-actively/pymdp` with `pushurl` set to `DISABLED`,
+so it is fetch-only and is never pushed to. Sync by merging `upstream/main`
+into a branch off `master`, and land it as a merge commit (never squash or
+rebase, because custody records pin commit SHAs). The divergence in
+`manual-branch-nightly.yaml` and `nightly-tests.yaml` is deliberate: the fork
+keeps `workflow_dispatch`-only scheduling and a `master` checkout ref and takes
+upstream's step-level changes on top. The current fork delta is whatever
+`git diff --stat upstream/main master` lists.
 
 ## Verification gate
 
