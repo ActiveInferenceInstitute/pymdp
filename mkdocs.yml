@@ -55,6 +55,7 @@ nav:
       - PymdpEnv and Custom Environments: guides/pymdp-env.md
       - Generative Model Structure: guides/generative-model-structure.md
       - Publishing Models as GNN Specifications: guides/gnn-interoperability.md
+      - Fork and Upstream: guides/fork-and-upstream.md
   - Migration:
       - NumPy/legacy to JAX: migration/numpy-to-jax.md
   - Tutorials:
