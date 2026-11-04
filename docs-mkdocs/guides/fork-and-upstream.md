@@ -42,6 +42,27 @@ At the time of writing the fork is 16 commits ahead of and 1 commit behind
 `upstream/main`; the upstream-only commit is `c8be101`
 (`fix(graph_worlds): reject partial or mismatched batch locations`).
 
+## The measured documentation gaps are upstream's
+
+The fleet scorecard measured 34 authored directories without a README or
+`AGENTS.md` at fork tip `8a1cd26`. Every one is in an upstream-inherited tree:
+
+- `docs-mkdocs/` and 13 subdirectories: `algos`, `api`, `assets`,
+  `development`, `getting-started`, `guides`, `javascripts`, `migration`,
+  `notebooks`, `overrides/modules`, `styles`, `tutorials`,
+  `tutorials/notebooks`;
+- `examples/` and 11 subdirectories: `advanced`,
+  `advanced/infer_states_optimization`, `api`, `envs`,
+  `experimental/sophisticated_inference`, `gnn`, `inductive_inference`,
+  `inference_and_learning`, `learning`, `model_fitting`, `sparse`;
+- `pymdp/`, `pymdp/envs`, `pymdp/envs/assets`, `pymdp/planning`;
+- `scripts`, `test`, `test/matlab_crossval/generation`, `paper`.
+
+Those gaps belong to `infer-actively/pymdp`. The fork does not add signposts to
+upstream code paths, because that turns a reversible sync into a fork-only
+divergence. The fork's own documentation surfaces are listed under
+[What the fork adds](#what-the-fork-adds).
+
 ## Documentation boundaries
 
 The upstream-inherited documentation trees (`docs-mkdocs/`, `examples/`,
