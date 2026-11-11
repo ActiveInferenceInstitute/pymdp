@@ -1,7 +1,7 @@
 # AII sidecar — InstituteOS metadata. Schema: aii_platform.aii_sidecar
 meta:
   sidecar_version: 1.2.1
-  updated: '2026-11-10'
+  updated: '2026-11-11'
 repo:
   name: pymdp
   slug: pymdp
@@ -63,6 +63,9 @@ artifacts:
 - path: CHANGELOG.md
   kind: doc
   description: Changelog.
+- path: test
+  kind: test
+  description: Test suite.
 - path: paper
   kind: publication
   description: Published paper artifacts.
@@ -86,8 +89,8 @@ capabilities:
 - ci
 tasks:
   test:
-    cmd: python -m pytest
-    description: Run the test suite.
+    cmd: python -m pytest test -m "not nightly"
+    description: Run the unit test suite (nightly-marked tests excluded).
 docs:
 - README.md
 - AGENTS.md

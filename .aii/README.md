@@ -41,7 +41,7 @@ Institute repositories without touching this project's own content. The schema i
 
 | Task | Command | Working directory | Description |
 | --- | --- | --- | --- |
-| `test` | `python -m pytest` | `.` | Run the test suite. |
+| `test` | `python -m pytest test -m "not nightly"` | `.` | Run the unit test suite (nightly-marked tests excluded). |
 
 ## Links
 

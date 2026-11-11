@@ -50,13 +50,14 @@
 | `LICENSE` | `doc` | License. |
 | `AGENTS.md` | `doc` | Agent guidance. |
 | `CHANGELOG.md` | `doc` | Changelog. |
+| `test` | `test` | Test suite. |
 | `paper` | `publication` | Published paper artifacts. |
 
 ## Portable tasks
 
 | Task | Command | Working directory | Description |
 | --- | --- | --- | --- |
-| `test` | `python -m pytest` | `.` | Run the test suite. |
+| `test` | `python -m pytest test -m "not nightly"` | `.` | Run the unit test suite (nightly-marked tests excluded). |
 
 ## Validation
 
