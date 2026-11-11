@@ -10,10 +10,10 @@ also live in [`TASKS.md`](TASKS.md).
   [`docs-mkdocs/`](docs-mkdocs/README.md) and is built by
   [`mkdocs.yml`](mkdocs.yml) (`docs_dir: docs-mkdocs`). This is deliberate, not a
   missing tree; recorded here so it is not "fixed" by duplicating the tree.
-- [ ] **README test command.** The README's "Run tests" block shows
-  `pytest test`, which is weaker than the documented gate
-  `uv run pytest test -n 2 -m "not nightly"` in [`AGENTS.md`](AGENTS.md). The
-  gate is the source of truth; keep them consistent if the README is tightened.
+- [x] ✓ **README test command.** The README's "Run tests" block now shows the
+  documented gate `uv run pytest test -n 2 -m "not nightly"`, matching
+  [`AGENTS.md`](AGENTS.md) and
+  [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md).
 - [x] ✓ **Testing page.** Added
   [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md)
   (pass 3), with the unit gate, nightly split, GNN opt-in tests, lint, and docs

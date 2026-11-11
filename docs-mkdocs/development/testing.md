@@ -27,8 +27,9 @@ uv run pytest test -n 2 -m "not nightly"
   directory (`TMPDIR=$(mktemp -d)`) so parallel JAX compilation does not collide.
 
 The suite covers the JAX-first core (`pymdp/agent.py`, `pymdp/inference.py`,
-`pymdp/control.py`, `pymdp/learning.py`, `pymdp/math`, `pymdp/planning/`) and the
-archived NumPy implementation under `pymdp/legacy/` used for cross-validation.
+`pymdp/control.py`, `pymdp/learning.py`, `pymdp/maths.py`, `pymdp/planning/`)
+and the archived NumPy implementation under `pymdp/legacy/` used for
+cross-validation.
 
 ## Nightly tests
 
