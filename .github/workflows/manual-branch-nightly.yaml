@@ -19,8 +19,12 @@ concurrency:
   group: manual-branch-nightly-${{ inputs.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   nightly:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,7 +39,7 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Set up Python ${{ inputs.python_version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python_version }}
 

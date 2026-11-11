@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:
       contents: write       # commit version bumps, create release tag
@@ -32,6 +37,7 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   build:
+    timeout-minutes: 120
     name: Build distribution
     needs: release-please
     if: ${{ needs.release-please.outputs.releases_created == 'true' }}
@@ -70,6 +76,7 @@ jobs:
           path: dist/
 
   publish:
+    timeout-minutes: 120
     name: Publish to PyPI
     needs: [release-please, build]
     if: ${{ needs.release-please.outputs.releases_created == 'true' }}

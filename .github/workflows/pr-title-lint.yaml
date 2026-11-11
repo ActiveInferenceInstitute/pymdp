@@ -13,8 +13,13 @@ on:
 permissions:
   pull-requests: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
+    timeout-minutes: 120
     name: Validate conventional-commit PR title
     runs-on: ubuntu-latest
     steps:

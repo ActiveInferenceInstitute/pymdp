@@ -1,14 +1,18 @@
-# AII sidecar — InstituteOS metadata. Schema: instituteos.platform.aii_sidecar
+# AII sidecar — InstituteOS metadata. Schema: aii_platform.aii_sidecar
 meta:
-  updated: '2026-06-30'
+  sidecar_version: 1.2.1
+  updated: '2026-11-10'
 repo:
   name: pymdp
   slug: pymdp
   full_name: ActiveInferenceInstitute/pymdp
-  description: A Python implementation of active inference for Markov Decision Processes
+  description: 'A Python implementation of active inference for Markov Decision Processes:
+    build generative models, infer states and policies by free-energy minimization,
+    and simulate agents in discrete environments.'
   default_branch: master
 institute:
   category: research-software
+  maturity: released
   steward: Active Inference Institute
 ecosystem:
   relations:
@@ -17,6 +21,29 @@ ecosystem:
     note: Federated via the InstituteOS .aii manifest.
   - repo: ActiveInferenceInstitute/Active_Inference_Ontology
     note: Uses Active Inference Ontology terms.
+  - repo: ActiveInferenceInstitute/pymcp
+    relation: feeds
+    note: Exposes PyMDP over the Model Context Protocol and REST.
+  - repo: ActiveInferenceInstitute/active_inference_language_model
+    relation: feeds
+    note: Conformance target for the AILM discrete language stack.
+  - repo: ActiveInferenceInstitute/active_inference_power
+    relation: feeds
+    note: Agent engine for the statistical-power simulations.
+  - repo: ActiveInferenceInstitute/policy_entanglement
+    relation: feeds
+    note: POMDP engine for the policy-entanglement experiments.
+  - repo: ActiveInferenceInstitute/on_policy_distillation
+    relation: feeds
+    note: POMDP classroom engine for the distillation experiments.
+  - repo: ActiveInferenceInstitute/active_fractal_rabbit
+    relation: feeds
+    note: Agent engine for the FractalRabbit scaffold.
+  - repo: ActiveInferenceInstitute/Biofirm
+    relation: feeds
+    note: Agent engine for ecological control experiments.
+  - repo: ActiveInferenceInstitute/Generalized_Notation_Notation
+    note: Uses Generalized Notation Notation (GNN) for model specifications.
   links:
     github: https://github.com/ActiveInferenceInstitute/pymdp
     website: https://www.activeinference.org
@@ -30,23 +57,41 @@ artifacts:
 - path: LICENSE
   kind: doc
   description: License.
+- path: AGENTS.md
+  kind: doc
+  description: Agent guidance.
+- path: CHANGELOG.md
+  kind: doc
+  description: Changelog.
+- path: paper
+  kind: publication
+  description: Published paper artifacts.
 provenance:
   license: MIT
   citation:
     doi: 10.21105/joss.04098
+    text: Active Inference Institute — pymdp.
 instituteos:
   tags:
   - pymdp
   - python
-  - implementation
-  - inference
-  - markov
+  - active-inference
+  - markov-blankets
+  - variational-message-passing
 capabilities:
 - python-package
 - tested
 - notebooks
 - dataset
+- ci
 tasks:
   test:
     cmd: python -m pytest
     description: Run the test suite.
+docs:
+- README.md
+- AGENTS.md
+- docs/INTEGRATION.md
+- docs/README.md
+- docs/AGENTS.md
+schema: aii-sidecar/v1

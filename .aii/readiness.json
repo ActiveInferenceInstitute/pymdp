@@ -1,0 +1,11 @@
+{
+  "schema": "aii-readiness/v1",
+  "repo": "ActiveInferenceInstitute/pymdp",
+  "tier": "python-library",
+  "standard_version": "1.0.0",
+  "baseline": {
+    "commit": "d22e2535fd1aac6d45b277c8fad1d3078ec8faaf",
+    "measured_at": "2026-11-10"
+  },
+  "waivers": []
+}

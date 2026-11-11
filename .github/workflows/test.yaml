@@ -7,8 +7,16 @@ on:
   pull_request:
     branches: [main, master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   build:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     env:
       # Work around a jaxlib 0.10.2+ XLA:CPU bug: the default-on __ynn_fusion path
