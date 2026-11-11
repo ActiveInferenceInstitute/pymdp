@@ -51,13 +51,14 @@
 | `AGENTS.md` | `doc` | Agent guidance. |
 | `CHANGELOG.md` | `doc` | Changelog. |
 | `test` | `test` | Test suite. |
+| `docs-mkdocs` | `doc` | Published documentation tree (mkdocs source). |
 | `paper` | `publication` | Published paper artifacts. |
 
 ## Portable tasks
 
 | Task | Command | Working directory | Description |
 | --- | --- | --- | --- |
-| `test` | `python -m pytest test -m "not nightly"` | `.` | Run the unit test suite (nightly-marked tests excluded). |
+| `test` | `uv run pytest test -n 2 -m "not nightly"` | `.` | Run the unit test suite (nightly-marked tests excluded). |
 
 ## Validation
 

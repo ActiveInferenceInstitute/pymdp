@@ -8,6 +8,20 @@ documented in `docs-mkdocs/guides/generative-model-structure.md`.
 This repository is a tracked fork of
 [`infer-actively/pymdp`](https://github.com/infer-actively/pymdp). `origin` is
 `ActiveInferenceInstitute/pymdp` and `master` is the fork's default branch.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| [`pymdp/`](pymdp/README.md) | The importable library (JAX-first; `legacy/` is the archived NumPy implementation). |
+| [`test/`](test/) | pytest suite; see [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md). |
+| [`docs-mkdocs/`](docs-mkdocs/README.md) | Documentation source, built by [`mkdocs.yml`](mkdocs.yml) (`docs_dir: docs-mkdocs`). |
+| [`examples/`](examples/README.md) | Curated notebooks and runnable examples. |
+| [`scripts/`](scripts/README.md) | Docs build/serve and notebook tooling. |
+| [`paper/`](paper/) | JOSS paper artifacts. |
+| [`.aii/`](.aii/README.md) | InstituteOS sidecar metadata. |
+| [`TODO.md`](TODO.md) · [`TASKS.md`](TASKS.md) | Owner backlog and planning signpost. |
+
 Fork-local changes stay additive so that merges from `upstream/main` remain
 clean: the fork delta is the `.aii` InstituteOS sidecar, `TASKS.md`, the two
 fork-local nightly workflows, the `master` entries in the three CI branch

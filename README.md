@@ -8,6 +8,52 @@
 A Python package for simulating Active Inference agents in Markov Decision Process environments.
 Please see our companion paper, published in the Journal of Open Source Software: ["pymdp: A Python library for active inference in discrete state spaces"](https://joss.theoj.org/papers/10.21105/joss.04098) for an overview of the package and its motivation. For a more in-depth, tutorial-style introduction to the package and a mathematical overview of active inference in Markov Decision Processes, see the [longer arxiv version](https://arxiv.org/abs/2201.03904) of the paper.
 
+> **Fork notice.** This checkout is the Active Inference Institute fork
+> (`ActiveInferenceInstitute/pymdp`, default branch `master`) of
+> [`infer-actively/pymdp`](https://github.com/infer-actively/pymdp). Fork-local
+> additions stay additive; see [`AGENTS.md`](AGENTS.md) and [`TODO.md`](TODO.md).
+
+## Contents
+
+- [Project status](#project-status)
+- [Documentation](#documentation)
+- [Citing `pymdp`](#citing-pymdp)
+- [Quick-start: Installation and Usage](#quick-start-installation-and-usage)
+- [Getting started / introductory material](#getting-started--introductory-material)
+- [Publishing models as Generalized Notation Notation (GNN)](#publishing-models-as-generalized-notation-notation-gnn)
+- [Contributing](#contributing)
+- [Contributors](#contributors)
+
+## Project status
+
+`pymdp` is released and actively developed. The default backend since 1.0.0 is
+**JAX**; the archived NumPy implementation lives under `pymdp/legacy/` for
+migration and cross-validation. Everything below runs locally once the declared
+dependencies are installed (`uv sync --group test`).
+
+- **Tests:** the documented unit gate is
+  `uv run pytest test -n 2 -m "not nightly"` (nightly tests and notebook suites
+  are scheduled separately).
+- **Docs:** source lives in [`docs-mkdocs/`](docs-mkdocs/README.md) and builds
+  with `./scripts/docs_build.sh` (strict mkdocs).
+- **Network/credentials:** none required for install, tests, or a docs build.
+- **GNN interop:** `test/test_gnn_bridge.py` is opt-in and needs an exported GNN
+  tree (`PYMDP_GNN_ROOT`); it skips cleanly otherwise.
+
+## Documentation
+
+The published site is <https://pymdp-rtd.readthedocs.io/en/latest/>; its source
+is the [`docs-mkdocs/`](docs-mkdocs/README.md) tree.
+
+- [Docs source index](docs-mkdocs/index.md)
+- [Installation](docs-mkdocs/getting-started/installation.md)
+- [Quickstart (JAX)](docs-mkdocs/getting-started/quickstart-jax.md)
+- [Generative model structure](docs-mkdocs/guides/generative-model-structure.md)
+- [NumPy/legacy to JAX migration](docs-mkdocs/migration/numpy-to-jax.md)
+- [GNN interoperability](docs-mkdocs/guides/gnn-interoperability.md)
+- [Testing](docs-mkdocs/development/testing.md)
+- [API reference](docs-mkdocs/api/index.md)
+
 ## Citing `pymdp`
 If you use `pymdp` in your work or research, please cite:
 
@@ -192,8 +238,11 @@ uv sync --group test --extra modelfit
 Run tests:
 
 ```bash
-pytest test
+uv run pytest test -n 2 -m "not nightly"
 ```
+
+The full gate (nightly tests excluded) is documented in [`AGENTS.md`](AGENTS.md)
+and [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md).
 
 Build docs locally:
 

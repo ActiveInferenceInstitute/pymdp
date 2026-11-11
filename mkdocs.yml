@@ -78,4 +78,5 @@ nav:
       - Legacy/NumPy Archive: legacy/index.md
   - Development:
       - Viewing Docs Locally: development/viewing-docs.md
+      - Testing: development/testing.md
       - Release Notes: development/release-notes.md

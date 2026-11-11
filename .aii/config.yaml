@@ -12,6 +12,7 @@ repo:
   default_branch: master
 institute:
   category: research-software
+  status: active
   maturity: released
   steward: Active Inference Institute
 ecosystem:
@@ -66,6 +67,9 @@ artifacts:
 - path: test
   kind: test
   description: Test suite.
+- path: docs-mkdocs
+  kind: doc
+  description: Published documentation tree (mkdocs source).
 - path: paper
   kind: publication
   description: Published paper artifacts.
@@ -89,7 +93,7 @@ capabilities:
 - ci
 tasks:
   test:
-    cmd: python -m pytest test -m "not nightly"
+    cmd: uv run pytest test -n 2 -m "not nightly"
     description: Run the unit test suite (nightly-marked tests excluded).
 docs:
 - README.md
