@@ -148,7 +148,7 @@ If the build output mentions `graphviz/cgraph.h`, install or verify the Graphviz
 
 ## Verify docs build
 ```bash
-./scripts/docs_build.sh
+./gate.sh docs
 ```
 
 ## Alternative: `pip`

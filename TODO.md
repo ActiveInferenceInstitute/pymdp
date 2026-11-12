@@ -39,8 +39,8 @@ also live in [`TASKS.md`](TASKS.md).
 ## Known defects
 
 - [ ] None verified in this pass. Lint debt and any test failures are reported by
-  the declared gate (`uv run pytest test -n 2 -m "not nightly"` and
-  `uv run --group dev ruff check`), not tracked here as a standing list.
+  the declared gate (`./gate.sh test` and `./gate.sh lint`), not tracked here as
+  a standing list.
 
 ## Owner decisions
 
