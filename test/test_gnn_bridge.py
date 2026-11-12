@@ -26,6 +26,7 @@ from pymdp.agent import Agent
 
 GNN_SOURCE_ROOT = os.environ.get(gnn.GNN_SOURCE_ENV)
 GNN_CHECKOUT = os.environ.get("PYMDP_GNN_CHECKOUT")
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def build_agent(num_obs=3, num_states=3, num_actions=3, seed=0, num_timesteps=4):
@@ -366,6 +367,27 @@ class TestGNNExecutorRoundTrip(unittest.TestCase):
                 err_msg=f"belief mismatch at step {step}",
             )
             prior = replay.update_empirical_prior(jnp.array([[action]]), qs)
+
+
+@unittest.skipUnless(
+    GNN_SOURCE_ROOT, f"{gnn.GNN_SOURCE_ENV} is not set; skipping pin reader test"
+)
+class TestPinRecord(unittest.TestCase):
+    """The pin is read by the shipped reader, never by a copy kept here."""
+
+    def test_pin_agrees_with_the_bridge_constants(self):
+        source_root = str(pathlib.Path(GNN_SOURCE_ROOT).resolve())
+        sys.path.insert(0, source_root)
+        try:
+            from gnn.importers import PIN_SCHEMA, UPSTREAM_REPOSITORY, read_pin
+        finally:
+            sys.path.remove(source_root)
+
+        pin = read_pin(REPO_ROOT / ".github" / "gnn-pin.json")
+        self.assertEqual(pin.schema, PIN_SCHEMA)
+        self.assertEqual(pin.repository, UPSTREAM_REPOSITORY)
+        self.assertEqual(pin.commit, gnn.GNN_PINNED_REVISION)
+        self.assertEqual(pin.tag, gnn.GNN_PINNED_RELEASE)
 
 
 if __name__ == "__main__":

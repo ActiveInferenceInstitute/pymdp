@@ -7,14 +7,19 @@ Markdown specification and validates that specification with the real GNN
 parser, so a model defined in `pymdp` can be published, reviewed, and executed
 by GNN tooling without re-entering its matrices by hand.
 
-The bridge targets GNN **v5.0.3**, revision
-[`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1)
-(`pymdp.gnn.GNN_PINNED_REVISION`).
+The bridge targets GNN **v5.1.0**, revision
+[`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf).
 
-That constant is the canonical pin for this repository: there is no
-`.github/gnn-pin.json` sidecar and no dedicated GNN conformance job in CI — the
-pin is released and validated by the opt-in test arm
-(`./gate.sh gnn`), which skips without an exported tree rather than passing.
+That revision is recorded in [`.github/gnn-pin.json`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/gnn-pin.json),
+read by GNN's own importer reader (`python -m gnn.importers check --repo .`),
+and pointed at by [`.github/GNN.md`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/GNN.md).
+`pymdp.gnn.GNN_PINNED_RELEASE` / `GNN_PINNED_REVISION` mirror the pin for
+library consumers; `./gate.sh gnn` runs the reader from the pinned parser tree
+and requires the mirror to agree with the pin, so the checks cannot drift apart.
+
+`pymdp` declares no hosted conformance job: the GNN arm is opt-in and local
+because it needs the pinned GNN tree, which the arm exports itself when
+`PYMDP_GNN_ROOT` does not already name one.
 
 ## Install
 
@@ -71,7 +76,7 @@ Export the pinned revision into a directory of your choice (this is exactly the
 committed tree, independent of any uncommitted work in the checkout):
 
 ```bash
-git -C /path/to/Generalized_Notation_Notation archive 8f293d9ba src | tar -x -C /tmp/gnn-pin
+git -C /path/to/Generalized_Notation_Notation archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C /tmp/gnn-pin
 export PYMDP_GNN_ROOT=/tmp/gnn-pin/src
 ```
 
@@ -81,7 +86,7 @@ The same export is available from Python:
 from pymdp import gnn
 
 exported = gnn.export_pinned_source("/path/to/Generalized_Notation_Notation", "/tmp/gnn-pin")
-print(exported.revision)  # 8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1
+print(exported.revision)  # 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf
 ```
 
 Then validate:
@@ -119,11 +124,13 @@ own inference for the same observation/action sequence to within `1e-6`.
 ```bash
 PYMDP_GNN_ROOT=/tmp/gnn-pin/src \
 PYMDP_GNN_CHECKOUT=/path/to/Generalized_Notation_Notation \
-uv run pytest test/test_gnn_bridge.py -v
+./gate.sh gnn
 ```
 
-Without `PYMDP_GNN_ROOT` the pinned-parser and executor tests skip (they are
-opt-in by construction); the emission, refusal, and shape tests always run.
+`./gate.sh gnn` runs the shipped importer reader over the pin and pointer, then
+this test file against the same tree (exporting the pinned revision first when
+`PYMDP_GNN_ROOT` is unset). The emission, refusal, and shape tests also run
+under `./gate.sh test`, which needs no GNN tree.
 
 ## Scope and boundaries
 
@@ -145,9 +152,9 @@ actions (a single planning step); a multi-step policy prior is refused.
 
 GNN at the pinned revision:
 
-- [Framework integration guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1/docs/gnn/integration/framework_integration_guide.md)
-- [GNN syntax specification](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1/docs/gnn/gnn_syntax.md)
-- [PyMDP implementation guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1/docs/gnn/implementations/pymdp.md)
+- [Framework integration guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/integration/framework_integration_guide.md)
+- [GNN syntax specification](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/gnn_syntax.md)
+- [PyMDP implementation guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/implementations/pymdp.md)
 
 Newer than the pinned revision, on GNN `main`:
 
