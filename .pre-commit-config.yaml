@@ -3,8 +3,8 @@ repos:
     hooks:
       - id: ruff
         name: ruff lint
-        # Uses the ruff bounded in the `dev` dependency group, matching CI.
-        entry: uv run --group dev ruff check --force-exclude
+        # The gate owns the command; CI runs the same arm.
+        entry: ./gate.sh lint
         language: system
         types_or: [python, pyi, jupyter]
         require_serial: true
