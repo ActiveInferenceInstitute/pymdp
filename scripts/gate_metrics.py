@@ -146,15 +146,17 @@ def render(results: dict[str, tuple[Result, Result]], host: dict[str, str]) -> s
     lines.append("")
     lines.append("## Test selection")
     lines.append("")
-    lines.append("| Arm | Selected | Deselected | Passed |")
-    lines.append("| --- | --- | --- | --- |")
+    lines.append("| Arm | Selected | Passed | Skipped | Failed |")
+    lines.append("| --- | --- | --- | --- | --- |")
     for arm_name, label in (("test", "`test` (nightly deselected)"), ("test-full", "`test-full`")):
         if arm_name not in results:
             continue
         counts = results[arm_name][1].counts
-        selected = counts.get("passed", 0) + counts.get("failed", 0) + counts.get("error", 0)
+        passed = counts.get("passed", 0)
+        skipped = counts.get("skipped", 0)
+        failed = counts.get("failed", 0) + counts.get("error", 0) + counts.get("errors", 0)
         lines.append(
-            f"| {label} | {selected} | {counts.get('deselected', 0)} | {counts.get('passed', 0)} |"
+            f"| {label} | {passed + skipped + failed} | {passed} | {skipped} | {failed} |"
         )
     lines.append("")
     lines.append("## Unmeasured arms")
