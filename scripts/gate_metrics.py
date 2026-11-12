@@ -122,8 +122,11 @@ def render(results: dict[str, tuple[Result, Result]], host: dict[str, str]) -> s
     lines.append(
         "Wall-clock cost of each gate arm, measured on the host below. `Before` is the "
         "raw command this repository documented before `./gate.sh` existed; `After` is "
-        "the same work dispatched through the gate. These are records, not budgets: "
-        "one run each, so treat sub-second differences as noise."
+        "the same work dispatched through the gate. These are records, not budgets: one "
+        "run each, back to back, so the second run of a pair also inherits whatever the "
+        "first warmed (the JAX compilation cache in `test/conftest.py` dominates this). "
+        "Differences in either direction are that warmth plus machine noise, not the "
+        "dispatcher."
     )
     lines.append("")
     lines.append("| Recorded | Value |")
