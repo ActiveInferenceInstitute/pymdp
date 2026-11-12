@@ -71,7 +71,6 @@ and uploaded four coverage artifacts, and `Python package` built and installed
 the distributions twice. Per-arm wall time did not change — the gate is a thin
 dispatcher — so the saving is the removed duplicate runs, not a faster command.
 
-
 ## Fast versus full
 
 The default arm is fast because it uses the repository's existing marker:
