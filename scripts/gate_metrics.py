@@ -194,7 +194,7 @@ DIGEST_PATHS = (
     "examples",
     "docs-mkdocs",
 )
-DIGEST_EXCLUDE = ":(exclude)docs-mkdocs/development/gate-metrics.md"
+DIGEST_EXCLUDE = "docs-mkdocs/development/gate-metrics.md"
 
 
 def inputs_digest() -> str:
@@ -204,14 +204,20 @@ def inputs_digest() -> str:
     not a contract. What must still hold is that the tree the numbers were taken
     from is the tree under test: compare git's own blob ids, never file mtimes.
     """
+    # ls-tree rejects exclude pathspec magic, so filter the page out here.
     listing = subprocess.run(
-        ["git", "ls-tree", "-r", "HEAD", "--", *DIGEST_PATHS, DIGEST_EXCLUDE],
+        ["git", "ls-tree", "-r", "HEAD", "--", *DIGEST_PATHS],
         cwd=ROOT,
         text=True,
         capture_output=True,
         check=True,
     ).stdout
-    return hashlib.sha256(listing.encode("utf-8")).hexdigest()[:16]
+    kept = [
+        line
+        for line in listing.splitlines()
+        if line.split("\t", 1)[-1] != DIGEST_EXCLUDE
+    ]
+    return hashlib.sha256("\n".join(kept).encode("utf-8")).hexdigest()[:16]
 
 
 def check() -> int:
