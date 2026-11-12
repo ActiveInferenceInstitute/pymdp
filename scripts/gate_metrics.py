@@ -15,6 +15,7 @@ and once through ``./gate.sh``, so the dispatcher's own cost stays visible.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import platform
 import re
@@ -183,28 +184,38 @@ def write_doc(text: str) -> None:
     tmp.replace(DOC)
 
 
-WATCHED = (
+DIGEST_PATHS = (
     "gate.sh",
-    "scripts/gate_metrics.py",
-    "scripts/run_notebook_manifest.py",
-    "scripts/docs_build.sh",
-    "scripts/sync_docs_notebooks.sh",
     "pyproject.toml",
     "mkdocs.yml",
-    "pymdp/",
-    "test/",
-    "examples/",
-    "docs-mkdocs/",
+    "scripts",
+    "pymdp",
+    "test",
+    "examples",
+    "docs-mkdocs",
 )
+DIGEST_EXCLUDE = ":(exclude)docs-mkdocs/development/gate-metrics.md"
+
+
+def inputs_digest() -> str:
+    """Digest the tracked inputs an arm's numbers depend on.
+
+    A squash merge rewrites commit ids, so the recorded commit is provenance,
+    not a contract. What must still hold is that the tree the numbers were taken
+    from is the tree under test: compare git's own blob ids, never file mtimes.
+    """
+    listing = subprocess.run(
+        ["git", "ls-tree", "-r", "HEAD", "--", *DIGEST_PATHS, DIGEST_EXCLUDE],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    return hashlib.sha256(listing.encode("utf-8")).hexdigest()[:16]
 
 
 def check() -> int:
-    """Verify the recorded page still describes this tree.
-
-    The page is measured before it is committed, so its commit is normally the
-    parent of HEAD; what matters is that the measurement still covers the arms
-    and that nothing that feeds an arm changed after it was recorded.
-    """
+    """Verify the recorded page still describes this tree."""
     if not DOC.exists():
         print(f"{DOC.relative_to(ROOT)} is missing; run ./gate.sh bench", file=sys.stderr)
         return 1
@@ -213,29 +224,16 @@ def check() -> int:
     for arm in ARMS:
         if f"`{arm.name}`" not in text:
             problems.append(f"arm {arm.name!r} is not recorded")
-    recorded = re.search(r"\| Repository commit \| `([0-9a-f]+)` \|", text)
+    recorded = re.search(r"\| Inputs digest \| `([0-9a-f]+)` \|", text)
     if not recorded:
-        problems.append("no recorded repository commit")
+        problems.append("no recorded inputs digest")
     else:
-        commit = recorded.group(1)
-        ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", commit, "HEAD"], cwd=ROOT
-        )
-        if ancestor.returncode != 0:
-            problems.append(f"recorded commit {commit[:12]} is not an ancestor of HEAD")
-        else:
-            changed = subprocess.run(
-                ["git", "diff", "--name-only", f"{commit}..HEAD"], cwd=ROOT, text=True, capture_output=True
-            ).stdout.split()
-            drift = [
-                path
-                for path in changed
-                if path.startswith(WATCHED) and path != DOC.relative_to(ROOT).as_posix()
-            ]
-            if drift:
-                problems.append(
-                    "inputs changed since the measurement: " + ", ".join(drift[:5])
-                )
+        current = inputs_digest()
+        if recorded.group(1) != current:
+            problems.append(
+                f"inputs digest {recorded.group(1)} does not match the tree "
+                f"({current}); re-run ./gate.sh bench"
+            )
     if problems:
         print("gate metrics page is stale:", file=sys.stderr)
         for problem in problems:
@@ -261,6 +259,7 @@ def main() -> int:
     host = {
         "Recorded (UTC)": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "Repository commit": f"`{commit}`",
+        "Inputs digest": f"`{inputs_digest()}`",
         "Host": f"{platform.system()} {platform.release()} ({platform.machine()})",
         "Python (project `.venv`)": python_version(),
         "uv": uv_version().removeprefix("uv "),
