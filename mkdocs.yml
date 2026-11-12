@@ -6,6 +6,9 @@ repo_name: infer-actively/pymdp
 docs_dir: docs-mkdocs
 exclude_docs: |
   overrides/**
+  # The directory hub is for GitHub browsing; it would collide with index.md
+  # at the site root (MkDocs maps a directory README.md to the index path).
+  README.md
 site_dir: !ENV [MKDOCS_SITE_DIR, site]
 strict: true
 validation:
@@ -47,6 +50,7 @@ plugins:
             heading_level: 2
 nav:
   - Home: index.md
+  - Documentation Index: documentation-index.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart (JAX): getting-started/quickstart-jax.md
@@ -78,5 +82,6 @@ nav:
       - Legacy/NumPy Archive: legacy/index.md
   - Development:
       - Viewing Docs Locally: development/viewing-docs.md
-      - Testing: development/testing.md
+      - Testing and Gates: development/testing.md
+      - Gate Measurements: development/gate-metrics.md
       - Release Notes: development/release-notes.md

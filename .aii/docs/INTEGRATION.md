@@ -58,7 +58,7 @@
 
 | Task | Command | Working directory | Description |
 | --- | --- | --- | --- |
-| `test` | `uv run pytest test -n 2 -m "not nightly"` | `.` | Run the unit test suite (nightly-marked tests excluded). |
+| `test` | `./gate.sh test` | `.` | Run the unit test suite (nightly-marked tests excluded). |
 
 ## Validation
 

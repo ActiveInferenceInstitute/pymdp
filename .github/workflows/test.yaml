@@ -14,16 +14,17 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Work around a jaxlib 0.10.2+ XLA:CPU bug: the default-on __ynn_fusion path
+  # crashes/hangs on rank>=7 broadcast-multiply-reduce kernels on x86-64, which
+  # stalls the padded-A jit cells in the infer_states notebooks for >2000s.
+  # See https://github.com/jax-ml/jax/issues/39257. Remove once fixed upstream.
+  XLA_FLAGS: --xla_cpu_experimental_ynn_fusion_type=
+
 jobs:
-  build:
+  unit:
     timeout-minutes: 120
     runs-on: ubuntu-latest
-    env:
-      # Work around a jaxlib 0.10.2+ XLA:CPU bug: the default-on __ynn_fusion path
-      # crashes/hangs on rank>=7 broadcast-multiply-reduce kernels on x86-64, which
-      # stalls the padded-A jit cells in the infer_states notebooks for >2000s.
-      # See https://github.com/jax-ml/jax/issues/39257. Remove once fixed upstream.
-      XLA_FLAGS: --xla_cpu_experimental_ynn_fusion_type=
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
@@ -39,13 +40,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg graphviz libgraphviz-dev pkg-config build-essential python3-dev
-      - name: Install dependencies
-        run: |
-          uv sync --group test
-      - name: Running unit tests with coverage
-        run: |
-          uv run pytest test -n 2 -m "not nightly" --cov=pymdp --cov-report=xml --cov-report=html --cov-report=term
+      # Coverage is collected once (3.14); the other interpreters run the same
+      # arm without it instead of re-uploading identical reports.
+      - name: Unit gate with coverage
+        if: matrix.python-version == '3.14'
+        run: ./gate.sh test -- --cov=pymdp --cov-report=xml --cov-report=html --cov-report=term
+      - name: Unit gate
+        if: matrix.python-version != '3.14'
+        run: ./gate.sh test
       - name: Upload coverage reports as artifact
+        if: matrix.python-version == '3.14'
         uses: actions/upload-artifact@v4
         with:
           name: pymdp-coverage-${{ matrix.python-version }}
@@ -53,6 +57,24 @@ jobs:
             coverage.xml
             htmlcov/
           retention-days: 30
-      - name: Running CI-tier notebook tests
+
+  notebooks:
+    # The notebook tier is version-independent JAX code; one interpreter (the
+    # same 3.14 used for docs and packaging) is enough, instead of repeating the
+    # 16-notebook run in every matrix cell.
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Install system dependencies
         run: |
-          uv run python scripts/run_notebook_manifest.py test/notebooks/ci_notebooks.txt
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg graphviz libgraphviz-dev pkg-config build-essential python3-dev
+      - name: CI-tier notebook gate
+        run: ./gate.sh notebooks

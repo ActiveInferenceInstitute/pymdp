@@ -15,6 +15,7 @@ on:
       - '.readthedocs.yml'
       - 'pyproject.toml'
       - 'pymdp/**'
+      - 'gate.sh'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
@@ -26,6 +27,7 @@ on:
       - '.readthedocs.yml'
       - 'pyproject.toml'
       - 'pymdp/**'
+      - 'gate.sh'
       - '.github/workflows/docs.yml'
 
 concurrency:
@@ -47,12 +49,9 @@ jobs:
           python-version: '3.14'
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - name: Install dependencies
-        run: |
-          uv sync --no-default-groups --extra docs
-      - name: Sync curated notebook docs
-        run: |
-          ./scripts/sync_docs_notebooks.sh
-      - name: Build docs (strict)
-        run: |
-          uv run --no-default-groups --extra docs mkdocs build --strict
+      # The gate's docs arm syncs the curated notebooks and then builds with
+      # --no-sync, so the environment it builds in is this one, exactly.
+      - name: Install docs environment
+        run: uv sync --no-default-groups --extra docs
+      - name: Docs gate (strict build)
+        run: ./gate.sh docs

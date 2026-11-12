@@ -31,11 +31,11 @@ Please see our companion paper, published in the Journal of Open Source Software
 migration and cross-validation. Everything below runs locally once the declared
 dependencies are installed (`uv sync --group test`).
 
-- **Tests:** the documented unit gate is
-  `uv run pytest test -n 2 -m "not nightly"` (nightly tests and notebook suites
-  are scheduled separately).
+- **Gates:** one entry point, `./gate.sh <arm>`; the unit gate is
+  `./gate.sh test` (nightly tests and the notebook suite are separate arms).
+  Arms are listed in [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md).
 - **Docs:** source lives in [`docs-mkdocs/`](docs-mkdocs/README.md) and builds
-  with `./scripts/docs_build.sh` (strict mkdocs).
+  with `./gate.sh docs` (notebook sync + strict mkdocs).
 - **Network/credentials:** none required for install, tests, or a docs build.
 - **GNN interop:** `test/test_gnn_bridge.py` is opt-in and needs an exported GNN
   tree (`PYMDP_GNN_ROOT`); it skips cleanly otherwise.
@@ -235,20 +235,18 @@ uv sync --group test --extra nb
 uv sync --group test --extra modelfit
 ```
 
-Run tests:
+Run the gates:
 
 ```bash
-uv run pytest test -n 2 -m "not nightly"
+./gate.sh test    # unit gate (nightly tests deselected)
+./gate.sh docs    # strict mkdocs build
+./gate.sh all     # everything except the nightly tier
 ```
 
-The full gate (nightly tests excluded) is documented in [`AGENTS.md`](AGENTS.md)
-and [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md).
-
-Build docs locally:
-
-```bash
-./scripts/docs_build.sh
-```
+Every arm is documented in [`AGENTS.md`](AGENTS.md) and
+[`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md);
+measured arm times live in the generated
+[`docs-mkdocs/development/gate-metrics.md`](docs-mkdocs/development/gate-metrics.md).
 
 ## Contributors
 
