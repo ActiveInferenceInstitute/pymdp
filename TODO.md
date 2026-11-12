@@ -10,10 +10,14 @@ also live in [`TASKS.md`](TASKS.md).
   [`docs-mkdocs/`](docs-mkdocs/README.md) and is built by
   [`mkdocs.yml`](mkdocs.yml) (`docs_dir: docs-mkdocs`). This is deliberate, not a
   missing tree; recorded here so it is not "fixed" by duplicating the tree.
-- [x] ✓ **README test command.** The README's "Run tests" block now shows the
-  documented gate `uv run pytest test -n 2 -m "not nightly"`, matching
-  [`AGENTS.md`](AGENTS.md) and
-  [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md).
+- [x] ✓ **Single gate entry point.** `./gate.sh` now owns every check (lint,
+  test, test-full, test-nightly, gnn, notebooks, notebooks-nightly, docs,
+  package, bench, all) and the workflows and the pre-commit hook call those
+  same arms. Measured arm times: the generated
+  [`docs-mkdocs/development/gate-metrics.md`](docs-mkdocs/development/gate-metrics.md).
+- [x] ✓ **Flat documentation index.** Added
+  [`docs-mkdocs/documentation-index.md`](docs-mkdocs/documentation-index.md) and
+  registered it in `mkdocs.yml` nav.
 - [x] ✓ **Testing page.** Added
   [`docs-mkdocs/development/testing.md`](docs-mkdocs/development/testing.md)
   (pass 3), with the unit gate, nightly split, GNN opt-in tests, lint, and docs

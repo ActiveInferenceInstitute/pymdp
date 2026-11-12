@@ -11,6 +11,11 @@ The bridge targets GNN **v5.0.3**, revision
 [`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1)
 (`pymdp.gnn.GNN_PINNED_REVISION`).
 
+That constant is the canonical pin for this repository: there is no
+`.github/gnn-pin.json` sidecar and no dedicated GNN conformance job in CI — the
+pin is released and validated by the opt-in test arm
+(`./gate.sh gnn`), which skips without an exported tree rather than passing.
+
 ## Install
 
 The bridge itself needs only `numpy` (already a pymdp dependency). Validating a

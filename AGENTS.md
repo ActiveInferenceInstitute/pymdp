@@ -41,12 +41,25 @@ upstream's step-level changes on top. The current fork delta is whatever
 
 ## Verification gate
 
+`./gate.sh` is the single entry point; each arm is separately runnable and CI
+calls the same arms, so a command is never defined twice.
+
 ```bash
-uv venv .venv && uv sync --group test          # once
-uv run pytest test -n 2 -m "not nightly"       # documented unit gate
-uv run --group dev ruff check                  # lint (ruff is capped at 0.15.x)
-./scripts/docs_build.sh                        # strict mkdocs build
+uv venv .venv && uv sync --group test   # once (add --group dev --extra docs as needed)
+./gate.sh lint                          # ruff, pinned by the dev group
+./gate.sh test                          # unit gate: nightly marker deselected
+./gate.sh test-full                     # everything, including nightly tests
+./gate.sh notebooks                     # CI-tier notebook manifest
+./gate.sh gnn                           # GNN bridge tests (skips without PYMDP_GNN_ROOT)
+./gate.sh docs                          # notebook sync + strict mkdocs build
+./gate.sh package                       # sdist/wheel build + install/import smoke test
+./gate.sh all                           # lint, test, gnn, docs, notebooks
 ```
+
+Measured arm wall time and test counts live in the generated
+[`docs-mkdocs/development/gate-metrics.md`](docs-mkdocs/development/gate-metrics.md)
+(`./gate.sh bench` refreshes it; `--check` verifies it). There is no type-checker
+arm because the repository configures none.
 
 Run long suites serially, and give nested pytest runs their own temporary
 directory (`TMPDIR=$(mktemp -d)`) so parallel JAX compilation does not collide.

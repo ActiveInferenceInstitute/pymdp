@@ -11,11 +11,17 @@ Run them from the repository root with the docs/notebook extras installed.
 | [`sync_docs_notebooks.sh`](sync_docs_notebooks.sh) | Copy/convert `examples/` notebooks into the docs tree. |
 | [`run_notebook_manifest.py`](run_notebook_manifest.py) | Execute the notebooks listed in a manifest (used by CI/nightly). |
 | [`notebook_precommit.py`](notebook_precommit.py) | Pre-commit hook that keeps notebooks clean. |
+| [`gate_metrics.py`](gate_metrics.py) | Measure every `./gate.sh` arm and rewrite `docs-mkdocs/development/gate-metrics.md` (`./gate.sh bench`). |
 
 ## Usage
 
+These are the implementations the gate arms call; use the arms so CI and local
+runs cannot diverge.
+
 ```bash
-./scripts/docs_build.sh                 # build the site
+./gate.sh docs                          # build the site (syncs notebooks first)
+./gate.sh notebooks                     # the CI notebook tier
+./gate.sh bench                         # refresh the measured gate numbers
 ./scripts/docs_sync_and_serve.sh        # sync notebooks + serve
 uv run python scripts/run_notebook_manifest.py test/notebooks/ci_notebooks.txt
 ```
