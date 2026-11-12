@@ -35,14 +35,32 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+      - name: Check out the pinned GNN tree
+        run: |
+          set -euo pipefail
+          PIN=.github/gnn-pin.json
+          REPO=$(python -c "import json;print(json.load(open('$PIN'))['repository'])")
+          TAG=$(python -c "import json;print(json.load(open('$PIN'))['tag'])")
+          REVISION=$(python -c "import json;print(json.load(open('$PIN'))['revision'])")
+          # The checkout follows .github/gnn-pin.json, so a pin bump re-points
+          # it; the GNN source tree stays external to the package.
+          git clone --depth 1 --branch "$TAG" "https://github.com/$REPO" ../Generalized_Notation_Notation
+          test "$(git -C ../Generalized_Notation_Notation rev-parse HEAD)" = "$REVISION"
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg graphviz libgraphviz-dev pkg-config build-essential python3-dev
       - name: Install dependencies
         run: |
-          uv sync --group test
+          uv sync --group test --extra gnn
       - name: Running unit tests with coverage
+        env:
+          # The GNN bridge tests run against the pinned tree, so they must fail
+          # rather than skip if it is missing (see AGENTS.md, "never convert a
+          # skip into a pass").
+          PYMDP_GNN_ROOT: ${{ github.workspace }}/../Generalized_Notation_Notation/src
+          PYMDP_GNN_CHECKOUT: ${{ github.workspace }}/../Generalized_Notation_Notation
+          PYMDP_GNN_REQUIRED: "1"
         run: |
           uv run pytest test -n 2 -m "not nightly" --cov=pymdp --cov-report=xml --cov-report=html --cov-report=term
       - name: Upload coverage reports as artifact

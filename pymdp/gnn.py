@@ -77,6 +77,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 __all__ = [
+    "GNN_PIN_FILE",
     "GNN_PINNED_RELEASE",
     "GNN_PINNED_REVISION",
     "GNN_SPEC_SUFFIX",
@@ -87,17 +88,58 @@ __all__ = [
     "FlatPOMDP",
     "GNNValidationReport",
     "PinnedGNNSource",
+    "load_gnn_pin",
     "to_gnn_spec",
     "write_gnn_spec",
     "validate_gnn_spec",
     "export_pinned_source",
 ]
 
-#: GNN release this bridge targets.
-GNN_PINNED_RELEASE = "v5.0.3"
+#: Committed GNN pin file, relative to the repository root. It is the
+#: authoritative source of the pinned revision; the ``_GNN_PINNED_*`` fallback
+#: constants are used only when the file is absent (for example a wheel install).
+GNN_PIN_FILE = ".github/gnn-pin.json"
 
-#: Commit of the pinned GNN release (``origin/main`` tip of v5.0.3).
-GNN_PINNED_REVISION = "8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1"
+#: Fallback GNN release, used only when :data:`GNN_PIN_FILE` cannot be read.
+_GNN_PINNED_RELEASE_FALLBACK = "v5.0.3"
+
+#: Fallback commit of the pinned GNN release, used only when
+#: :data:`GNN_PIN_FILE` cannot be read.
+_GNN_PINNED_REVISION_FALLBACK = "8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1"
+
+
+def load_gnn_pin(
+    pin_file: str | os.PathLike[str] | None = None,
+) -> dict[str, Any] | None:
+    """Read the committed GNN pin and return it as a mapping, or ``None``.
+
+    The pin lives at :data:`GNN_PIN_FILE` in the repository root. ``None`` means
+    the file is absent or unreadable (for example a wheel install), in which
+    case :data:`GNN_PINNED_REVISION` and :data:`GNN_PINNED_RELEASE` fall back to
+    their in-code constants.
+    """
+    path = (
+        Path(pin_file)
+        if pin_file is not None
+        else Path(__file__).resolve().parents[1] / GNN_PIN_FILE
+    )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+_gnn_pin = load_gnn_pin() or {}
+
+#: GNN release this bridge targets. Authoritative source: the ``tag`` field of
+#: :data:`GNN_PIN_FILE`; the fallback constant applies only when it is absent.
+GNN_PINNED_RELEASE = _gnn_pin.get("tag") or _GNN_PINNED_RELEASE_FALLBACK
+
+#: Commit of the pinned GNN release. Authoritative source: the ``revision``
+#: field of :data:`GNN_PIN_FILE`; the fallback constant applies only when it is
+#: absent.
+GNN_PINNED_REVISION = _gnn_pin.get("revision") or _GNN_PINNED_REVISION_FALLBACK
 
 #: Suffix for emitted specifications (self-identifying; GNN parses it as Markdown).
 GNN_SPEC_SUFFIX = ".gnn.md"

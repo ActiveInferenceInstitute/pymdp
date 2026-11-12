@@ -7,7 +7,9 @@ The pinned-parser and executor round trips are opt-in: they run only when
 ``PYMDP_GNN_ROOT`` names a directory containing the ``gnn`` package (an
 exported pinned tree; see ``pymdp.gnn.export_pinned_source``), and the ``gnn``
 extra is installed (``uv sync --group test --extra gnn``). Without that they
-skip cleanly instead of silently passing.
+skip cleanly instead of silently passing. When ``PYMDP_GNN_REQUIRED=1`` (CI has
+provisioned the pinned checkout) a missing tree fails the suite instead of
+skipping.
 """
 
 import os
@@ -26,6 +28,22 @@ from pymdp.agent import Agent
 
 GNN_SOURCE_ROOT = os.environ.get(gnn.GNN_SOURCE_ENV)
 GNN_CHECKOUT = os.environ.get("PYMDP_GNN_CHECKOUT")
+
+# CI sets this once it has provisioned the pinned checkout: the GNN half of the
+# bridge is then expected to run, so a missing tree must fail the suite rather
+# than skip (SCOPING §D5; AGENTS.md "never convert a skip into a pass").
+GNN_REQUIRED = os.environ.get("PYMDP_GNN_REQUIRED") == "1"
+
+if GNN_REQUIRED and not GNN_SOURCE_ROOT:
+    raise RuntimeError(
+        f"{gnn.GNN_SOURCE_ENV} is required (PYMDP_GNN_REQUIRED=1) but is unset; "
+        "provision the pinned GNN checkout instead of skipping the bridge tests"
+    )
+if GNN_REQUIRED and not GNN_CHECKOUT:
+    raise RuntimeError(
+        "PYMDP_GNN_CHECKOUT is required (PYMDP_GNN_REQUIRED=1) but is unset; "
+        "provision the pinned GNN checkout instead of skipping the export test"
+    )
 
 
 def build_agent(num_obs=3, num_states=3, num_actions=3, seed=0, num_timesteps=4):
