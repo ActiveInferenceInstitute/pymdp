@@ -30,10 +30,16 @@ also live in [`TASKS.md`](TASKS.md).
   (macOS: Homebrew `graphviz`; Debian/Ubuntu: `graphviz libgraphviz-dev
   pkg-config build-essential python3-dev`). Notes in
   [`docs-mkdocs/getting-started/installation.md`](docs-mkdocs/getting-started/installation.md).
-- [ ] **GNN opt-in tests need a pinned export.** `test/test_gnn_bridge.py` skips
-  unless `PYMDP_GNN_ROOT` points at an exported GNN tree (add
-  `PYMDP_GNN_CHECKOUT` for the pinned-export test). A skip is never a pass. See
-  [`AGENTS.md`](AGENTS.md) and
+- [x] ✓ **GNN importer conformance adopted.** The pin is
+  [`.github/gnn-pin.json`](.github/gnn-pin.json) (GNN `v5.1.0` at
+  `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`, was `v5.0.3` at
+  `8f293d9b` as code constants only), read by GNN's shipped reader
+  (`python -m gnn.importers check --repo . --require-pointer`) and pointed at by
+  [`.github/GNN.md`](.github/GNN.md). `./gate.sh gnn` exports the pinned tree
+  itself (`PYMDP_GNN_CHECKOUT`, default a sibling checkout; or set
+  `PYMDP_GNN_ROOT` to an existing export) and fails rather than skipping. There
+  is still no hosted GNN conformance job: the arm is local and opt-in, since it
+  needs a materialized pinned tree. See [`AGENTS.md`](AGENTS.md) and
   [`docs-mkdocs/guides/gnn-interoperability.md`](docs-mkdocs/guides/gnn-interoperability.md).
 
 ## Known defects

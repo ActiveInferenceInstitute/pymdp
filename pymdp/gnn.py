@@ -34,7 +34,7 @@ Usage
     path = gnn.write_gnn_spec("my_model.gnn.md", agent, name="my_model")
 
     # Bind validation to an exported, immutable copy of the pinned GNN tree:
-    #   git -C <gnn-checkout> archive 8f293d9ba src | tar -x -C <destination>
+    #   git -C <gnn-checkout> archive 75c834bd8 src | tar -x -C <destination>
     report = gnn.validate_gnn_spec(agent, path, gnn_source_root="<destination>/src")
     assert report.ok, report.describe()
 
@@ -93,11 +93,13 @@ __all__ = [
     "export_pinned_source",
 ]
 
-#: GNN release this bridge targets.
-GNN_PINNED_RELEASE = "v5.0.3"
+#: GNN release this bridge targets. Mirrors ``.github/gnn-pin.json``: the pin is
+#: the record, this constant is the code-facing surface for library consumers,
+#: and ``./gate.sh gnn`` requires the two to agree.
+GNN_PINNED_RELEASE = "v5.1.0"
 
-#: Commit of the pinned GNN release (``origin/main`` tip of v5.0.3).
-GNN_PINNED_REVISION = "8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1"
+#: Commit of the pinned GNN release (the commit ``v5.1.0`` names).
+GNN_PINNED_REVISION = "75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf"
 
 #: Suffix for emitted specifications (self-identifying; GNN parses it as Markdown).
 GNN_SPEC_SUFFIX = ".gnn.md"

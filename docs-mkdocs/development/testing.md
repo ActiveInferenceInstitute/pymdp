@@ -100,22 +100,31 @@ runner CI uses:
 
 Both arms default to `-n0` inside the runner to avoid xdist/nbval conflicts.
 
-## GNN bridge tests (opt-in)
+## GNN bridge and importer conformance (opt-in)
 
 `test/test_gnn_bridge.py` publishes a flat POMDP as a Generalized Notation
-Notation specification and validates it against the pinned GNN parser. This
-repository carries the bridge and its pin in code — `pymdp.gnn.GNN_PINNED_RELEASE`
-/ `pymdp.gnn.GNN_PINNED_REVISION` — and no `.github/gnn-pin.json` file and no
-dedicated CI conformance job; the GNN checks are this opt-in arm only.
+Notation specification and validates it against the pinned GNN parser.
+
+The pin is a file, [`.github/gnn-pin.json`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/gnn-pin.json),
+which records GNN `v5.1.0` at `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`. It is
+read by GNN's shipped reader — `python -m gnn.importers check --repo .` — not by
+a local parser, and [`.github/GNN.md`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/GNN.md)
+is the pointer that reader checks. `pymdp.gnn.GNN_PINNED_RELEASE` /
+`GNN_PINNED_REVISION` mirror the pin for library consumers; the arm requires the
+mirror and the pin to agree.
 
 ```bash
-GNN_CHECKOUT=/path/to/Generalized_Notation_Notation
-git -C "$GNN_CHECKOUT" archive 8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1 src | tar -x -C /tmp/gnn-pin
+PYMDP_GNN_CHECKOUT=/path/to/Generalized_Notation_Notation ./gate.sh gnn
+# or point the arm at a tree you exported yourself:
+#   git -C "$GNN_CHECKOUT" archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C /tmp/gnn-pin
 PYMDP_GNN_ROOT=/tmp/gnn-pin/src ./gate.sh gnn
 ```
 
-Without `PYMDP_GNN_ROOT` the parser and executor tests skip; the emission,
-refusal, and shape tests always run. Never convert a skip into a pass. See
+The arm exports the pinned revision from `PYMDP_GNN_CHECKOUT` (default: a
+sibling `Generalized_Notation_Notation` checkout) when `PYMDP_GNN_ROOT` is
+unset, so `./gate.sh gnn` always runs the reader and the pinned-parser tests
+against the revision the pin names instead of skipping. The emission, refusal,
+and shape tests also run under `./gate.sh test` without any GNN tree. See
 [`../guides/gnn-interoperability.md`](../guides/gnn-interoperability.md).
 
 ## Lint

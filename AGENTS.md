@@ -73,12 +73,21 @@ additive and keep one canonical home per concept: joint composition for
 factorized models belongs to GNN, so multi-modality/multi-factor models are
 refused here rather than flattened by a second convention.
 
-- Pin: `pymdp.gnn.GNN_PINNED_REVISION` = GNN v5.0.3
-  (`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`). Bump it deliberately, in one
-  place, with the validation test run.
+- Pin: `.github/gnn-pin.json` records GNN v5.1.0
+  (`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`). `pymdp.gnn.GNN_PINNED_RELEASE` /
+  `GNN_PINNED_REVISION` mirror it for library consumers, and `./gate.sh gnn`
+  requires the two to agree (`--expected-tag` / `--expected-commit`), so a bump
+  changes the pin first and the constants with it.
+- The pin is read by the shipped upstream reader, never by a copy kept here:
+  `python -m gnn.importers check --repo . --require-pointer` runs from the
+  pinned parser tree. `.github/GNN.md` is the pointer it checks.
 - Validation reads an exported pinned tree, never the live GNN working tree:
   `gnn.export_pinned_source(...)` or `git -C <gnn> archive <sha> src | tar -x`.
-- Opt-in tests: `PYMDP_GNN_ROOT=<exported>/src uv run pytest test/test_gnn_bridge.py -v`
-  (add `PYMDP_GNN_CHECKOUT=<gnn checkout>` for the pinned-export test). They skip
-  cleanly when the variable is unset; never convert a skip into a pass.
+  `./gate.sh gnn` exports the pinned revision from `PYMDP_GNN_CHECKOUT` (default:
+  a sibling `Generalized_Notation_Notation` checkout) unless `PYMDP_GNN_ROOT`
+  already names an export.
+- Tests: `./gate.sh gnn` runs the reader plus `test/test_gnn_bridge.py` against
+  that tree (bridge round trips included; the executor test needs
+  `PYMDP_GNN_CHECKOUT`). Without a materializable tree the arm fails rather than
+  skipping, and `./gate.sh test` still runs the emission and refusal tests.
 - Guide: `docs-mkdocs/guides/gnn-interoperability.md`.

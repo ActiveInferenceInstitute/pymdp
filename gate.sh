@@ -8,7 +8,7 @@
 #   ./gate.sh test               unit gate: nightly-marked tests deselected
 #   ./gate.sh test-full          every pytest test, including nightly-marked ones
 #   ./gate.sh test-nightly       only the nightly-marked tests
-#   ./gate.sh gnn                GNN bridge tests (skip unless PYMDP_GNN_ROOT is set)
+#   ./gate.sh gnn                GNN pin reader + bridge tests, from the pinned parser tree
 #   ./gate.sh notebooks          CI-tier notebook manifest
 #   ./gate.sh notebooks-nightly  nightly-tier notebook manifest
 #   ./gate.sh docs               curated-notebook sync + strict mkdocs build
@@ -21,6 +21,11 @@
 #
 # Set GATE_PYTHON to choose the interpreter for the `package` arm's throwaway
 # environment (default: 3.14, the version CI builds docs and packages with).
+#
+# The `gnn` arm runs the shipped reader and the bridge tests against the pinned
+# GNN revision recorded in `.github/gnn-pin.json`. Set PYMDP_GNN_ROOT to a tree
+# you exported, or PYMDP_GNN_CHECKOUT to a GNN checkout (default: a sibling
+# `Generalized_Notation_Notation`) and the arm exports that revision itself.
 set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +34,8 @@ cd "$ROOT_DIR"
 GATE_PYTHON="${GATE_PYTHON:-3.14}"
 CI_NOTEBOOKS="test/notebooks/ci_notebooks.txt"
 NIGHTLY_NOTEBOOKS="test/notebooks/nightly_notebooks.txt"
+GNN_EXPORT_DIR=".cache/gnn-pin"
+GNN_DEFAULT_CHECKOUT="../Generalized_Notation_Notation"
 
 usage() {
   # Everything between the shebang and `set` is the arm list: keep one copy.
@@ -62,10 +69,56 @@ arm_test_nightly() {
   run test-nightly uv run --group test pytest test -n 2 -m nightly "$@"
 }
 
+gnn_bridge_pin() {
+  # The code-facing pin `pymdp.gnn` ships, one value per line.
+  uv run --group test --extra gnn python -c '
+from pymdp.gnn import GNN_PINNED_RELEASE, GNN_PINNED_REVISION
+
+print(GNN_PINNED_REVISION)
+print(GNN_PINNED_RELEASE)
+'
+}
+
+gnn_export() {
+  # Export the bridge's pinned revision from a GNN checkout; print the directory
+  # that holds the `gnn` package.
+  uv run --group test --extra gnn python - "$1" "$GNN_EXPORT_DIR" <<'PY'
+import sys
+
+from pymdp import gnn
+
+print(gnn.export_pinned_source(sys.argv[1], sys.argv[2]).path)
+PY
+}
+
 arm_gnn() {
-  # The pinned-parser and executor tests skip without PYMDP_GNN_ROOT; a skip is
-  # never reported as a pass by pytest.
-  run gnn uv run --group test --extra gnn pytest test/test_gnn_bridge.py -v "$@"
+  # Two checks, both against the pinned parser:
+  #   * the shipped reader validates `.github/gnn-pin.json` and `.github/GNN.md`
+  #     and requires them to agree with the bridge's constants;
+  #   * the bridge tests round-trip a model through that same parser.
+  # The reader needs a materialized pinned tree, so the arm exports it when
+  # PYMDP_GNN_ROOT does not already name one.
+  local pin revision release root checkout
+  pin="$(gnn_bridge_pin)" || return $?
+  revision="$(printf '%s\n' "$pin" | sed -n 1p)"
+  release="$(printf '%s\n' "$pin" | sed -n 2p)"
+  checkout="${PYMDP_GNN_CHECKOUT:-}"
+  root="${PYMDP_GNN_ROOT:-}"
+  if [[ -z "$root" ]]; then
+    checkout="${checkout:-$GNN_DEFAULT_CHECKOUT}"
+    printf '== gnn-export: %s from %s into %s\n' "$revision" "$checkout" "$GNN_EXPORT_DIR"
+    root="$(gnn_export "$checkout")" || return $?
+  fi
+  if [[ -z "$root" ]]; then
+    printf 'gate.sh: no pinned GNN tree; set PYMDP_GNN_ROOT or PYMDP_GNN_CHECKOUT\n' >&2
+    return 1
+  fi
+  run gnn-conformance env "PYTHONPATH=$root" uv run --group test --extra gnn \
+    python -m gnn.importers check --repo . --require-pointer \
+    --expected-commit "$revision" --expected-tag "$release" || return $?
+  run gnn env "PYTHONPATH=$root" "PYMDP_GNN_ROOT=$root" \
+    "PYMDP_GNN_CHECKOUT=$checkout" \
+    uv run --group test --extra gnn pytest test/test_gnn_bridge.py -v "$@"
 }
 
 arm_notebooks() {
