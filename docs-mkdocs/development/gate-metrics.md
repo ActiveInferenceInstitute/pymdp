@@ -6,8 +6,8 @@ Wall-clock cost of each gate arm, measured on the host below. `Before` is the ra
 
 | Recorded | Value |
 | --- | --- |
-| Recorded (UTC) | 2026-11-12 13:41 |
-| Repository commit | `f9465d9d8e2feb0430bd2bfbd53e922b7155e0c4` |
+| Recorded (UTC) | 2026-11-12 14:02 |
+| Repository commit | `ad0ed375b6e569170a782ef18ad8a91e9b4aba4b` |
 | Host | Darwin 27.0.0 (arm64) |
 | Python (project `.venv`) | 3.14.10 |
 | uv | 0.13.7 (Homebrew 2026-11-03 aarch64-apple-darwin) |
@@ -16,12 +16,12 @@ Wall-clock cost of each gate arm, measured on the host below. `Before` is the ra
 
 | Arm | Command | Before (s) | After (s) | Result |
 | --- | --- | --- | --- | --- |
-| `lint` | `uv run --group dev ruff check` | 0.1 | 0.1 | exit 0 |
-| `test` | `uv run --group test pytest test -n 2 -m not nightly` | 180.2 | 230.0 | exit 0 (346 passed, 5 skipped) |
-| `test-full` | `uv run --group test pytest test -n 2` | 225.8 | 201.0 | exit 0 (347 passed, 5 skipped) |
-| `gnn` | `uv run --group test --extra gnn pytest test/test_gnn_bridge.py -v` | 5.7 | 6.8 | exit 0 (13 passed, 5 skipped) |
-| `notebooks` | `uv run --group test --extra nb python scripts/run_notebook_manifest.py test/notebooks/ci_notebooks.txt` | 165.2 | 140.2 | exit 0 (188 passed, 5 skipped) |
-| `docs` | `./scripts/docs_build.sh` | 7.9 | 7.5 | exit 0 |
+| `lint` | `uv run --group dev ruff check` | 0.2 | 0.1 | exit 0 |
+| `test` | `uv run --group test pytest test -n 2 -m not nightly` | 280.0 | 286.6 | exit 0 (346 passed, 5 skipped) |
+| `test-full` | `uv run --group test pytest test -n 2` | 354.8 | 242.9 | exit 0 (347 passed, 5 skipped) |
+| `gnn` | `uv run --group test --extra gnn pytest test/test_gnn_bridge.py -v` | 3.6 | 3.9 | exit 0 (13 passed, 5 skipped) |
+| `notebooks` | `uv run --group test --extra nb python scripts/run_notebook_manifest.py test/notebooks/ci_notebooks.txt` | 144.7 | 156.3 | exit 0 (188 passed, 5 skipped) |
+| `docs` | `./scripts/docs_build.sh` | 10.2 | 9.7 | exit 0 |
 
 ## Test selection
 
