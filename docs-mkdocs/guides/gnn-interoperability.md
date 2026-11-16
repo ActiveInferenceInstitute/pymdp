@@ -36,6 +36,32 @@ uv pip install defusedxml psutil
 The GNN source tree stays external and pinned; you point the validator at an
 exported copy of it (below).
 
+## Verify a GNN scaling sweep
+
+GNN's dense PyMDP scaling runner emits `pymdp_scaling_run_manifest.json` and
+one Markdown fixture for each planned state-count and timestep pair. Pass the
+received manifest and its fixture directory to the separate consumer.
+
+```python
+from pathlib import Path
+
+from pymdp.gnn_scaling import verify_scaling_manifest
+
+sweep = verify_scaling_manifest(
+    Path("received/pymdp_scaling_run_manifest.json"),
+    Path("received/fixtures"),
+    producer_root=Path("reviewed-gnn-source"),  # optional source hash comparison
+)
+print(sweep.status, sweep.cells)
+```
+
+The verifier checks that planned and skipped cells partition the configured
+axes. It reads exact fixture bytes from the supplied directory, checks the
+byte counts and SHA-256 values, and independently checks the dense model's
+declared dimensions and horizon. `generated` identifies generation-only runs.
+The check covers fixture evidence. Matrix values, tensor orientation, native
+execution, and benchmark timings require their own evidence.
+
 ## Emit a specification
 
 ```python
