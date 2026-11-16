@@ -171,6 +171,9 @@ main() {
     *) printf 'gate.sh: unknown arm %s\n\n' "$arm"; usage; exit 2 ;;
   esac
   shift
+  if [[ "${1:-}" == -- ]]; then
+    shift
+  fi
   "arm_${arm//-/_}" "$@"
 }
 
