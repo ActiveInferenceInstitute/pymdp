@@ -19,6 +19,7 @@ import hashlib
 import os
 import platform
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -187,6 +188,7 @@ def write_doc(text: str) -> None:
 DIGEST_PATHS = (
     "gate.sh",
     "pyproject.toml",
+    "uv.lock",
     "mkdocs.yml",
     "scripts",
     "pymdp",
@@ -198,26 +200,40 @@ DIGEST_EXCLUDE = "docs-mkdocs/development/gate-metrics.md"
 
 
 def inputs_digest() -> str:
-    """Digest the tracked inputs an arm's numbers depend on.
+    """Digest working bytes within the gate's admitted input paths.
 
     A squash merge rewrites commit ids, so the recorded commit is provenance,
-    not a contract. What must still hold is that the tree the numbers were taken
-    from is the tree under test: compare git's own blob ids, never file mtimes.
+    not a contract. Git selects tracked and nonignored new inputs within
+    ``DIGEST_PATHS``; file contents and executable bits come from the working
+    tree, not HEAD or the index. Missing paths represent deletions. The optional
+    uv lockfile is included even when ignored, but unrelated overlays and the
+    generated metrics page are not inputs.
     """
-    # ls-tree rejects exclude pathspec magic, so filter the page out here.
     listing = subprocess.run(
-        ["git", "ls-tree", "-r", "HEAD", "--", *DIGEST_PATHS],
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *DIGEST_PATHS],
         cwd=ROOT,
-        text=True,
         capture_output=True,
         check=True,
     ).stdout
-    kept = [
-        line
-        for line in listing.splitlines()
-        if line.split("\t", 1)[-1] != DIGEST_EXCLUDE
-    ]
-    return hashlib.sha256("\n".join(kept).encode("utf-8")).hexdigest()[:16]
+    names = set(listing.split(b"\0")) - {b"", os.fsencode(DIGEST_EXCLUDE)}
+    names.add(b"uv.lock")
+    digest = hashlib.sha256(b"pymdp-gate-inputs-v2\0")
+    for name in sorted(names):
+        path = ROOT / os.fsdecode(name)
+        try:
+            mode = path.stat().st_mode
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISREG(mode):
+            raise OSError(f"gate metrics input is not a regular file: {os.fsdecode(name)}")
+        content = hashlib.sha256()
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                content.update(chunk)
+        digest.update(name + b"\0")
+        digest.update(b"executable\0" if mode & 0o111 else b"file\0")
+        digest.update(content.digest())
+    return digest.hexdigest()[:16]
 
 
 def check() -> int:
@@ -265,7 +281,6 @@ def main() -> int:
     host = {
         "Recorded (UTC)": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "Repository commit": f"`{commit}`",
-        "Inputs digest": f"`{inputs_digest()}`",
         "Host": f"{platform.system()} {platform.release()} ({platform.machine()})",
         "Python (project `.venv`)": python_version(),
         "uv": uv_version().removeprefix("uv "),
@@ -273,6 +288,8 @@ def main() -> int:
 
     results: dict[str, tuple[Result, Result]] = {}
     failed = False
+    measured_inputs = inputs_digest()
+    host["Inputs digest"] = f"`{measured_inputs}`"
     for arm in ARMS:
         if (only and arm.name not in only) or arm.name in skip:
             continue
@@ -286,6 +303,19 @@ def main() -> int:
             failed = True
             print(after.tail, file=sys.stderr)
         results[arm.name] = (before, after)
+
+    try:
+        current_inputs = inputs_digest()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"could not bind gate inputs after measurement; metrics not published: {exc}", file=sys.stderr)
+        return 1
+    if current_inputs != measured_inputs:
+        print(
+            "gate inputs changed during measurement; metrics not published "
+            f"({measured_inputs} -> {current_inputs}); re-run ./gate.sh bench with stable inputs",
+            file=sys.stderr,
+        )
+        return 1
 
     if only or skip:
         # A partial measurement must not overwrite the recorded page.

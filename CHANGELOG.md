@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — fork correctness
+
+- Preserve independent preference/prior batching, caller-owned observation
+  masks, joint action-support indexing, and A-only learning without actions.
+- Retain the one-frame VMP prior and horizon-one rollout learning context,
+  including warm starts; keep observed-action likelihood blocks independent.
+- Correct SI category identifiers, bounded joint observation branching, and
+  zero-padding treatment without changing the scientific normalization policy.
+- Refuse reused GNN exports and shape-mismatched matrices; qualify the real
+  v5.1.0 parser/executor from independently bound source bytes.
+- Preserve flat legacy-agent object-array publishing through the GNN adapter.
+- Bind metrics to working inputs, modes and lock content. No metrics
+  regeneration, released sibling dependency replacement, or publication is
+  implied. P2, P9 and P16 remain explicit owner/scientific boundaries.
+
 ## [1.0.5](https://github.com/infer-actively/pymdp/compare/v1.0.4...v1.0.5) (2026-11-07)
 
 
