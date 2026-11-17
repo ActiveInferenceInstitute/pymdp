@@ -98,27 +98,40 @@ orientation is self-describing rather than implied.
 
 ## Validate against the pinned GNN parser
 
-Export the pinned revision into a directory of your choice (this is exactly the
-committed tree, independent of any uncommitted work in the checkout):
+Export the pinned revision into a fresh directory. `export_pinned_source`
+accepts absent or empty nonsymlink destinations; it never overlays or removes
+an existing export. The exported bytes are independent of checkout WIP:
 
 ```bash
-git -C /path/to/Generalized_Notation_Notation archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C /tmp/gnn-pin
-export PYMDP_GNN_ROOT=/tmp/gnn-pin/src
+GNN_EXPORT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
+git -C /path/to/Generalized_Notation_Notation \
+  archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src |
+  tar -x -C "$GNN_EXPORT_ROOT"
+export PYMDP_GNN_ROOT="$GNN_EXPORT_ROOT/src"
 ```
 
 The same export is available from Python:
 
 ```python
+import tempfile
+
 from pymdp import gnn
 
-exported = gnn.export_pinned_source("/path/to/Generalized_Notation_Notation", "/tmp/gnn-pin")
+export_root = tempfile.mkdtemp(prefix="pymdp-gnn-pin-")
+exported = gnn.export_pinned_source(
+    "/path/to/Generalized_Notation_Notation", export_root
+)
 print(exported.revision)  # 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf
 ```
 
 Then validate:
 
 ```python
-report = gnn.validate_gnn_spec(agent, path, revision=gnn.GNN_PINNED_REVISION)
+report = gnn.validate_gnn_spec(
+    agent, path,
+    gnn_source_root=exported.path,
+    revision=exported.revision,
+)
 print(report.describe())
 assert report.ok
 ```
@@ -126,8 +139,8 @@ assert report.ok
 `validate_gnn_spec` runs the parser in an isolated subprocess (interpreter from
 `PYMDP_GNN_PYTHON`, default: the running interpreter), then compares:
 
-- every parsed matrix (`A`, `B`, `C`, `D`, and `E` when present) against the
-  source arrays, element for element at the source dtype;
+- actual `A`/`B` shapes before comparing their values; `C`/`D`/`E` accept
+  vectors or intentional single-row wrappers, then compare at source dtype;
 - the declared dimensions in `StateSpaceBlock` against the array shapes;
 - `num_hidden_states`, `num_obs`, `num_actions`, `num_timesteps`, and
   `b_tensor_order` in `ModelParameters`;
@@ -148,7 +161,7 @@ and executes it with GNN, and asserts that the recorded beliefs match pymdp's
 own inference for the same observation/action sequence to within `1e-6`.
 
 ```bash
-PYMDP_GNN_ROOT=/tmp/gnn-pin/src \
+PYMDP_GNN_ROOT="$GNN_EXPORT_ROOT/src" \
 PYMDP_GNN_CHECKOUT=/path/to/Generalized_Notation_Notation \
 ./gate.sh gnn
 ```
@@ -173,6 +186,9 @@ joint transition as the Kronecker product of the per-factor `B` tensors, and
 hand the resulting `A`/`B`/`C`/`D` to `gnn.FlatPOMDP.from_model`. Policy priors
 are likewise only expressible when the number of policies equals the number of
 actions (a single planning step); a multi-step policy prior is refused.
+
+Temporal-policy semantics at this unchanged pin remain P16. Static round-trip
+agreement is not evidence that the pin authenticates a temporal extension.
 
 ## Related documentation and projects
 

@@ -34,8 +34,9 @@ Usage
     path = gnn.write_gnn_spec("my_model.gnn.md", agent, name="my_model")
 
     # Bind validation to an exported, immutable copy of the pinned GNN tree:
-    #   git -C <gnn-checkout> archive 75c834bd8 src | tar -x -C <destination>
-    report = gnn.validate_gnn_spec(agent, path, gnn_source_root="<destination>/src")
+    #   export_root="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
+    #   git -C <gnn-checkout> archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C "$export_root"
+    report = gnn.validate_gnn_spec(agent, path, gnn_source_root="<export_root>/src")
     assert report.ok, report.describe()
 
 The emitted file follows GNN's canonical discrete-POMDP section order
@@ -276,7 +277,8 @@ class FlatPOMDP:
     B:
         Transition tensor, shape ``(num_states, num_states, num_actions)`` in
         pymdp's canonical ``(next_state, previous_state, action)`` orientation.
-        A 2-D ``B`` is promoted to a single-action tensor.
+        A 2-D ``B`` is promoted to a single-action tensor; ``from_model`` also
+        accepts a singleton-batched passive matrix of shape ``(1, ns, ns)``.
     C:
         Log-preference vector, shape ``(num_obs,)``.
     D:
@@ -378,9 +380,16 @@ class FlatPOMDP:
         Accepts pymdp's list-of-arrays convention (``[A]``, ``[B]``, ...) with an
         optional leading batch axis of size 1, and plain arrays.
         """
+        A = _single(A, "A", expected_ranks=(2,))
+        B = _single(B, "B", expected_ranks=(2, 3))
+        num_states = A.shape[1]
+        # Rank three can mean passive + batch or controlled without a batch.
+        # State dimensions distinguish them; (1, 1, num_actions) is controlled.
+        if num_states != 1 and B.shape == (1, num_states, num_states):
+            B = B[0]
         return cls(
-            A=_single(A, "A", expected_ranks=(2,)),
-            B=_single(B, "B", expected_ranks=(2, 3)),
+            A=A,
+            B=B,
             C=_single(C, "C", expected_ranks=(1,)),
             D=_single(D, "D", expected_ranks=(1,)),
             E=None if E is None else _single(E, "E", expected_ranks=(1,)),
@@ -391,7 +400,7 @@ class FlatPOMDP:
 
     @classmethod
     def from_agent(cls, agent: Any, **kwargs: Any) -> "FlatPOMDP":
-        """Build a flat model from a pymdp :class:`pymdp.agent.Agent`.
+        """Build a flat model from a single-modality, single-factor pymdp agent.
 
         Refuses agents with more than one observation modality, more than one
         hidden-state factor, or a policy prior that is not a single-step habit
@@ -413,19 +422,12 @@ class FlatPOMDP:
             raise GNNBridgeError(
                 f"Expected a single control factor; got {num_controls}"
             )
-        A = _drop_batch(np.asarray(agent.A[0]), (2,), "A[0]")
-        B = _drop_batch(np.asarray(agent.B[0]), (2, 3), "B[0]")
-        C = _drop_batch(np.asarray(agent.C[0]), (1,), "C[0]")
-        D = _drop_batch(np.asarray(agent.D[0]), (1,), "D[0]")
-        E = None
-        if getattr(agent, "E", None) is not None:
-            E = _drop_batch(np.asarray(agent.E), (1,), "E")
-        return cls(
-            A=A,
-            B=B,
-            C=C,
-            D=D,
-            E=E,
+        return cls.from_model(
+            A=agent.A[0],
+            B=agent.B[0],
+            C=agent.C[0],
+            D=agent.D[0],
+            E=getattr(agent, "E", None),
             **kwargs,
         )
 
@@ -626,11 +628,21 @@ def export_pinned_source(
     """Export ``revision`` of ``gnn_checkout`` into ``destination``.
 
     Uses ``git archive`` so the exported tree is exactly the committed revision,
-    independent of any uncommitted work in the checkout. Returns the exported
-    directory (the one containing the ``gnn`` package) plus the resolved commit.
+    independent of any uncommitted work in the checkout. The destination must
+    be absent or an empty directory, not a symlink; existing exports are never
+    overlaid or removed. Returns the exported directory (the one containing the
+    ``gnn`` package) plus the resolved commit.
     """
     checkout = Path(gnn_checkout).resolve()
-    target = Path(destination).resolve()
+    target = Path(destination)
+    if target.is_symlink() or (target.exists() and not target.is_dir()):
+        raise GNNBridgeError(
+            f"Export destination must be an absent or empty directory, not {target}"
+        )
+    target.mkdir(parents=True, exist_ok=True)
+    if any(target.iterdir()):
+        raise GNNBridgeError(f"Export destination is not empty: {target}")
+    target = target.resolve()
     resolved = subprocess.run(
         ["git", "-C", str(checkout), "rev-parse", "--verify", f"{revision}^{{commit}}"],
         capture_output=True,
@@ -651,7 +663,6 @@ def export_pinned_source(
         raise GNNBridgeError(
             f"git archive failed for {sha[:8]}: {archive.stderr.decode().strip()}"
         )
-    target.mkdir(parents=True, exist_ok=True)
     _extract_tar(archive.stdout, target)
     source = target / subdirectory
     if not (source / "gnn" / "parsers" / "markdown_parser.py").is_file():
@@ -829,12 +840,15 @@ def validate_gnn_spec(
             if key not in parameters:
                 mismatches.append(f"{key} is missing from the parsed parameters")
                 continue
-            parsed = np.asarray(parameters[key], dtype=np.float64).reshape(-1)
-            source = np.asarray(array, dtype=np.float64).reshape(-1)
-            parsed_shapes[key] = tuple(int(dim) for dim in np.shape(parameters[key]))
+            parsed = np.asarray(parameters[key], dtype=np.float64)
+            source = np.asarray(array, dtype=np.float64)
+            parsed_shapes[key] = tuple(int(dim) for dim in parsed.shape)
+            # GNN represents emitted vectors as one row, unlike A/B tensors.
+            if key in ("C", "D", "E") and parsed.shape == (1, source.size):
+                parsed = parsed[0]
             if parsed.shape != source.shape:
                 mismatches.append(
-                    f"{key} parses to {parsed.shape} values; source has {source.shape}"
+                    f"{key} parses to shape {parsed.shape}; source has shape {source.shape}"
                 )
             elif not np.array_equal(parsed, source):
                 worst = float(np.max(np.abs(parsed - source)))

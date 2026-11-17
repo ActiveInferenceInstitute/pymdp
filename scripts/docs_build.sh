@@ -12,4 +12,4 @@ if ! uv run --no-sync python -c 'import mkdocs' >/dev/null 2>&1; then
 fi
 # --no-sync: build in the environment the caller prepared (CI syncs the docs
 # extra explicitly), never silently re-resolving and pruning other groups.
-uv run --no-sync mkdocs build --strict
+uv run --no-sync mkdocs build --strict "$@"

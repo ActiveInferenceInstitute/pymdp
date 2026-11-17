@@ -10,7 +10,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax.random as jr
 import jax.tree_util as jtu
-from jax import lax, vmap
+from jax import jit, lax, vmap
 
 from pymdp.agent import Agent
 from pymdp.envs import TMaze
@@ -928,6 +928,152 @@ class TestRolloutFunction(unittest.TestCase):
 
         self.assertTrue(jnp.allclose(learned_pB, expected_pB, atol=1e-5))
         self.assertTrue(jnp.allclose(learned_B, expected_B, atol=1e-5))
+
+
+class TestHorizonOneRolloutContracts(unittest.TestCase):
+    def test_sequence_one_frame_prior_uses_newly_selected_action(self):
+        expected = np.array([[0.9, 0.1], [0.1, 0.9], [0.9, 0.1]])
+        for algo in ("mmp", "vmp"):
+            agent = Agent(
+                A=[jnp.full((2, 2), 0.5)],
+                B=[jnp.stack([jnp.eye(2), jnp.array([[0.0, 1.0], [1.0, 0.0]])], axis=-1)],
+                D=[jnp.array([0.9, 0.1])],
+                inference_algo=algo, inference_horizon=1, num_iter=128,
+            )
+            env = PymdpEnv(A_dependencies=[[0]], B_dependencies=[[0]])
+            env_params = {
+                "A": agent.A, "B": agent.B, "D": [jnp.array([[1.0, 0.0]])]
+            }
+
+            def choose_swap(agent_obj, beliefs, rng_key):
+                del beliefs, rng_key
+                return jnp.broadcast_to(jnp.array([0.0, 1.0]), (agent_obj.batch_size, 2)), {}
+
+            def run(key):
+                return rollout(
+                    agent, env, 2, key, policy_search=choose_swap, env_params=env_params
+                )
+
+            for compiled in (False, True):
+                with self.subTest(algo=algo, compiled=compiled):
+                    last, info = (jit(run) if compiled else run)(jr.PRNGKey(1901))
+                    np.testing.assert_allclose(info["empirical_prior"][0][0], expected, atol=2e-5)
+                    np.testing.assert_allclose(info["qs"][0][0], expected, atol=2e-5)
+                    np.testing.assert_array_equal(info["action"], np.ones((1, 3, 1), dtype=np.int32))
+                    np.testing.assert_allclose(last["empirical_prior"][0], [[0.1, 0.9]], atol=2e-5)
+                    self.assertEqual(last["action_hist"].shape, (1, 0, 1))
+
+    def test_one_frame_learning_counts_real_inter_frame_transitions(self):
+        # With one state, every observation/transition contributes exactly one.
+        # This is only the horizon-one contract, not a replacement estimator for
+        # the scientifically unresolved overlapping-window case.
+        for algo in ("mmp", "vmp", "ovf", "exact"):
+            for learning_mode in ("online", "offline"):
+                for learn_A, learn_B in ((True, False), (False, True), (True, True)):
+                    with self.subTest(
+                        algo=algo, learning_mode=learning_mode,
+                        learn_A=learn_A, learn_B=learn_B,
+                    ):
+                        agent = Agent(
+                            A=[jnp.ones((1, 1))], B=[jnp.ones((1, 1, 1))],
+                            D=[jnp.ones(1)], pA=[jnp.full((1, 1), 2.0)],
+                            pB=[jnp.full((1, 1, 1), 2.0)],
+                            learn_A=learn_A, learn_B=learn_B,
+                            inference_algo=algo, inference_horizon=1,
+                            learning_mode=learning_mode,
+                        )
+                        env = PymdpEnv(A_dependencies=[[0]], B_dependencies=[[0]])
+                        params = {"A": agent.A, "B": agent.B, "D": agent.D}
+                        last, info = rollout(agent, env, 2, jr.PRNGKey(1902), env_params=params)
+                        if learn_A:
+                            expected_A = [3.0, 4.0, 5.0] if learning_mode == "online" else [2.0] * 3
+                            np.testing.assert_allclose(info["pA"][0][0, :, 0, 0], expected_A)
+                            np.testing.assert_allclose(last["agent"].pA[0], 5.0)
+                        if learn_B:
+                            expected_B = [2.0, 3.0, 4.0] if learning_mode == "online" else [2.0] * 3
+                            np.testing.assert_allclose(info["pB"][0][0, :, 0, 0, 0], expected_B)
+                            np.testing.assert_allclose(last["agent"].pB[0], 4.0)
+                        if learning_mode == "online":
+                            self.assertEqual(last["learning_qs"][0].shape, (1, 1, 1))
+
+    def test_one_frame_learning_preserves_soft_posterior_cell_counts(self):
+        for algo in ("mmp", "vmp", "ovf", "exact"):
+            with self.subTest(algo=algo):
+                agent = Agent(
+                    A=[jnp.array([[0.8, 0.2], [0.2, 0.8]])],
+                    B=[jnp.array([[0.8, 0.2], [0.2, 0.8]])[..., None]],
+                    D=[jnp.array([0.7, 0.3])],
+                    pA=[jnp.full((2, 2), 2.0)], pB=[jnp.full((2, 2, 1), 2.0)],
+                    learn_A=True, learn_B=True,
+                    inference_algo=algo, inference_horizon=1, num_iter=128,
+                )
+                env = PymdpEnv(A_dependencies=[[0]], B_dependencies=[[0]])
+                params = {
+                    "A": [jnp.eye(2)[None]],
+                    "B": [jnp.array([[[[0.0], [1.0]], [[1.0], [0.0]]]])],
+                    "D": [jnp.array([[1.0, 0.0]])],
+                }
+                last, info = rollout(agent, env, 2, jr.PRNGKey(1903), env_params=params)
+                beliefs = np.asarray(info["qs"][0])
+                observations = np.asarray(info["observation"][0])[..., 0]
+                np.testing.assert_array_equal(observations, [[0, 1, 0]])
+                obs_vectors = np.eye(2)[observations.astype(np.intp)]
+                expected_A_increments = np.einsum("bto,bts->btos", obs_vectors, beliefs)
+                A_history = np.concatenate(
+                    [np.asarray(agent.pA[0])[:, None], np.asarray(info["pA"][0])], axis=1
+                )
+                np.testing.assert_allclose(
+                    np.diff(A_history, axis=1), expected_A_increments, atol=2e-5
+                )
+
+                prev, current = beliefs[:, :-1], beliefs[:, 1:]
+                if algo in ("ovf", "exact"):
+                    transition = np.asarray(info["B"][0])[:, :-1, ..., 0]
+                    predicted = np.einsum("btij,btj->bti", transition, prev)
+                    expected_joints = (
+                        transition * prev[:, :, None, :]
+                        * (current / predicted)[:, :, :, None]
+                    )
+                else:
+                    expected_joints = current[:, :, :, None] * prev[:, :, None, :]
+                B_history = np.concatenate(
+                    [np.asarray(agent.pB[0])[:, None], np.asarray(info["pB"][0])], axis=1
+                )
+                increments = np.diff(B_history, axis=1)
+                np.testing.assert_allclose(increments[:, 0], 0.0, atol=1e-6)
+                np.testing.assert_allclose(
+                    increments[:, 1:, ..., 0], expected_joints, atol=2e-5
+                )
+                np.testing.assert_allclose(
+                    last["learning_qs"][0][:, 0], beliefs[:, -1], atol=1e-6
+                )
+
+    def test_one_frame_warm_start_keeps_separate_learning_context(self):
+        for algo in ("mmp", "ovf", "exact"):
+            for explicit_context in (False, True):
+                with self.subTest(algo=algo, explicit_context=explicit_context):
+                    agent = Agent(
+                        A=[jnp.full((2, 2), 0.5)],
+                        B=[jnp.full((2, 2, 1), 0.5)],
+                        pB=[jnp.full((2, 2, 1), 2.0)],
+                        learn_B=True, inference_algo=algo, inference_horizon=1,
+                        num_iter=128,
+                    )
+                    env = PymdpEnv(A_dependencies=[[0]], B_dependencies=[[0]])
+                    params = {"A": agent.A, "B": agent.B, "D": agent.D}
+                    previous = jnp.array([[[0.1, 0.9]]])
+                    learning_previous = jnp.array([[[0.8, 0.2]]]) if explicit_context else previous
+                    initial = {"qs": [previous], "action": jnp.array([[0]])}
+                    if explicit_context:
+                        initial["learning_qs"] = [learning_previous]
+                    last, _ = rollout(
+                        agent, env, 0, jr.PRNGKey(1904),
+                        initial_carry=initial, env_params=params,
+                    )
+                    expected_joint = np.array([0.5, 0.5])[:, None] * np.asarray(learning_previous)[0, 0]
+                    np.testing.assert_allclose(
+                        last["agent"].pB[0][0, ..., 0], 2.0 + expected_joint, atol=2e-5
+                    )
 
 
 if __name__ == "__main__":

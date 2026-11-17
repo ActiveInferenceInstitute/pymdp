@@ -34,7 +34,7 @@ cd "$ROOT_DIR"
 GATE_PYTHON="${GATE_PYTHON:-3.14}"
 CI_NOTEBOOKS="test/notebooks/ci_notebooks.txt"
 NIGHTLY_NOTEBOOKS="test/notebooks/nightly_notebooks.txt"
-GNN_EXPORT_DIR=".cache/gnn-pin"
+GNN_EXPORT_PREFIX=".cache/gnn-pin"
 GNN_DEFAULT_CHECKOUT="../Generalized_Notation_Notation"
 
 usage() {
@@ -82,7 +82,7 @@ print(GNN_PINNED_RELEASE)
 gnn_export() {
   # Export the bridge's pinned revision from a GNN checkout; print the directory
   # that holds the `gnn` package.
-  uv run --group test --extra gnn python - "$1" "$GNN_EXPORT_DIR" <<'PY'
+  uv run --group test --extra gnn python - "$1" "$2" <<'PY'
 import sys
 
 from pymdp import gnn
@@ -98,7 +98,7 @@ arm_gnn() {
   #   * the bridge tests round-trip a model through that same parser.
   # The reader needs a materialized pinned tree, so the arm exports it when
   # PYMDP_GNN_ROOT does not already name one.
-  local pin revision release root checkout
+  local pin revision release root checkout export_dir
   pin="$(gnn_bridge_pin)" || return $?
   revision="$(printf '%s\n' "$pin" | sed -n 1p)"
   release="$(printf '%s\n' "$pin" | sed -n 2p)"
@@ -106,8 +106,10 @@ arm_gnn() {
   root="${PYMDP_GNN_ROOT:-}"
   if [[ -z "$root" ]]; then
     checkout="${checkout:-$GNN_DEFAULT_CHECKOUT}"
-    printf '== gnn-export: %s from %s into %s\n' "$revision" "$checkout" "$GNN_EXPORT_DIR"
-    root="$(gnn_export "$checkout")" || return $?
+    mkdir -p "$(dirname "$GNN_EXPORT_PREFIX")" || return $?
+    export_dir="$(mktemp -d "${GNN_EXPORT_PREFIX}.XXXXXXXX")" || return $?
+    printf '== gnn-export: %s from %s into %s\n' "$revision" "$checkout" "$export_dir"
+    root="$(gnn_export "$checkout" "$export_dir")" || return $?
   fi
   if [[ -z "$root" ]]; then
     printf 'gate.sh: no pinned GNN tree; set PYMDP_GNN_ROOT or PYMDP_GNN_CHECKOUT\n' >&2

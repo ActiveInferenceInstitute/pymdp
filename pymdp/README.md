@@ -23,7 +23,16 @@ is JAX (`jax.numpy`); the NumPy implementation is preserved under
 - Model shapes, factor/modality ordering, and the agent loop are defined in
   [`../docs-mkdocs/guides/generative-model-structure.md`](../docs-mkdocs/guides/generative-model-structure.md).
   Read it before changing array conventions.
-- Keep fork-local additions additive (`gnn.py`, sidecar) so merges from
-  `upstream/main` stay clean — see [`../AGENTS.md`](../AGENTS.md).
+- Keep the default additive fork policy; the explicit 2026-11-13 correctness
+  exception and upstream-forwarding boundary are recorded in
+  [`../docs-mkdocs/guides/fork-and-upstream.md`](../docs-mkdocs/guides/fork-and-upstream.md).
 - API reference pages live under [`../docs-mkdocs/api/`](../docs-mkdocs/api/);
   docstrings use the NumPy style consumed by mkdocstrings.
+
+## Observed-action likelihoods
+
+The NumPyro likelihood path requires observation and sampled-action tuples.
+Blocks reset independently; there is no implicit inter-block carry or
+missing-input generative fallback. Probability columns follow public joint
+action-support indices. The joint `actions` sample site retains the original
+`action_vectors` alongside those indices.

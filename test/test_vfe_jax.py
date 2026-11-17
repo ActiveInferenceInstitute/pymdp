@@ -131,6 +131,34 @@ def _factorized_fpi_vfe_history(
     return qs_history, jnp.stack(vfe_history)
 
 
+class TestVMPInitialPrior(unittest.TestCase):
+    def test_one_frame_posterior_uses_prior_with_absent_or_empty_actions(self):
+        prior = jnp.array([0.9, 0.1])
+        B = [jnp.eye(2)[..., None]]
+        for likelihood in (jnp.full((2, 2), 0.5),
+                           jnp.array([[0.2, 0.8], [0.8, 0.2]])):
+            expected = np.asarray(likelihood[0] * prior)
+            expected = expected / expected.sum()
+            for actions in (None, jnp.empty((0, 1), dtype=jnp.int32)):
+                for distr_obs in (False, True):
+                    obs = ([jnp.array([[1.0, 0.0]])] if distr_obs
+                           else [jnp.array([0])])
+
+                    def infer(initial):
+                        return inference.update_posterior_states(
+                            A=[likelihood], B=B, obs=obs, past_actions=actions,
+                            prior=[initial], A_dependencies=[[0]],
+                            B_dependencies=[[0]], method="vmp", num_iter=16,
+                            distr_obs=distr_obs,
+                        )[0]
+
+                    with self.subTest(actions=actions, categorical=distr_obs):
+                        np.testing.assert_allclose(infer(prior)[0], expected,
+                                                   atol=1e-6)
+                        np.testing.assert_allclose(jit(infer)(prior)[0], expected,
+                                                   atol=1e-6)
+
+
 class TestCanonicalVFE(unittest.TestCase):
     def test_calc_vfe_single_step_matches_legacy_full_model(self):
         prior = [
