@@ -355,7 +355,9 @@ def get_vmp_messages(
             factors,
         )
     else:
-        lnB_future = jtu.tree_map(lambda x: 0., qs)
+        # A one-frame window still has its initial-state prior, even without
+        # a conditioned transition tensor (the same boundary used by MMP).
+        lnB_future = jtu.tree_map(lambda x: jnp.expand_dims(x, 0), ln_prior)
         lnB_past = jtu.tree_map(lambda x: 0., qs)
     
     return lnB_future, lnB_past 

@@ -1217,6 +1217,306 @@ class TestPoliciesTupleAgentEquivalence(unittest.TestCase):
         self.assertEqual(agent.B[1].shape, (1, 2, 2, 1))
 
 
+class TestAgentOwnershipAndShapeContracts(unittest.TestCase):
+    def test_masking_preserves_caller_observations_and_model(self):
+        for obs_format in ("discrete", "categorical", "agent_callback", "call_callback"):
+            for compiled in (False, True):
+                with self.subTest(obs_format=obs_format, compiled=compiled):
+                    categorical = obs_format != "discrete"
+                    callback = lambda observations: observations
+                    agent = Agent(
+                        A=[jnp.array([[0.9, 0.1], [0.1, 0.9]])],
+                        B=[jnp.eye(2)[..., None]],
+                        categorical_obs=categorical,
+                        preprocess_fn=callback if obs_format == "agent_callback" else None,
+                    )
+                    observations = [
+                        jnp.array([[[1.0, 0.0]]]) if categorical else jnp.array([[0]])
+                    ]
+                    original_observation = observations[0]
+                    original_A = agent.A[0]
+                    kwargs = {"preprocess_fn": callback} if obs_format == "call_callback" else {}
+
+                    def infer_masked(obs):
+                        return agent.infer_states(
+                            obs, agent.D, mask=[jnp.array(0.0)], **kwargs
+                        )
+
+                    masked = (jit(infer_masked) if compiled else infer_masked)(observations)
+                    unmasked = agent.infer_states(observations, agent.D, **kwargs)
+                    np.testing.assert_allclose(masked[0], [[[0.5, 0.5]]], atol=1e-6)
+                    np.testing.assert_allclose(unmasked[0], [[[0.9, 0.1]]], atol=1e-6)
+                    self.assertIs(observations[0], original_observation)
+                    self.assertIs(agent.A[0], original_A)
+                    np.testing.assert_array_equal(
+                        agent.A[0], jnp.array([[[0.9, 0.1], [0.1, 0.9]]])
+                    )
+
+    def test_full_multiaction_support_uses_feasible_first_tuples(self):
+        controls = [2, 2, 2]
+        B = [
+            jnp.broadcast_to(jnp.eye(2)[:, :, None, None, None], (2, 2, 2, 2, 2))
+            for _ in controls
+        ]
+        agent = Agent(
+            A=[jnp.eye(2) for _ in controls],
+            B=B,
+            A_dependencies=[[0], [1], [2]],
+            B_action_dependencies=[[0, 1, 2]] * 3,
+            num_controls=controls,
+            policy_len=2,
+        )
+        expected_support = np.repeat(np.arange(8)[:, None], 3, axis=1)
+        np.testing.assert_array_equal(agent.unique_multiactions, expected_support)
+        q_pi = jnp.arange(1, agent.policies.num_policies + 1, dtype=jnp.float32)[None]
+        q_pi = q_pi / q_pi.sum(axis=-1, keepdims=True)
+        first_actions = np.asarray(agent.policies.policy_arr[:, 0])
+        expected = np.array([
+            np.asarray(q_pi)[0, np.all(first_actions == action, axis=-1)].sum()
+            for action in expected_support
+        ])[None]
+        def probability_fn(q):
+            return agent.multiaction_probabilities(q)
+
+        for evaluate in (probability_fn, jit(probability_fn)):
+            probabilities = evaluate(q_pi)
+            self.assertEqual(probabilities.shape, (1, 8))
+            np.testing.assert_allclose(probabilities, expected, atol=1e-6)
+            np.testing.assert_allclose(probabilities.sum(axis=-1), 1.0, atol=1e-6)
+
+    def test_restricted_full_policies_group_duplicate_first_actions(self):
+        policies = (
+            ((2, 0), (0, 0)),
+            ((0, 1), (1, 1)),
+            ((2, 0), (2, 1)),
+        )
+        agent = Agent(
+            A=[jnp.eye(2), jnp.eye(2)],
+            B=[jnp.repeat(jnp.eye(2)[..., None], n, axis=-1) for n in (3, 2)],
+            A_dependencies=[[0], [1]],
+            policies=policies,
+            policy_len=2,
+        )
+        np.testing.assert_array_equal(agent.unique_multiactions, [[0, 1], [2, 0]])
+        np.testing.assert_allclose(
+            agent.multiaction_probabilities(jnp.array([[0.2, 0.3, 0.5]])),
+            [[0.3, 0.7]], atol=1e-6,
+        )
+
+    def test_restricted_marginal_support_matches_independent_sampled_actions(self):
+        agent = Agent(
+            A=[jnp.eye(2), jnp.eye(2)],
+            B=[jnp.repeat(jnp.eye(2)[..., None], 3, axis=-1) for _ in range(2)],
+            A_dependencies=[[0], [1]],
+            policies=(((0, 1),), ((2, 0),), ((2, 2),)),
+            sampling_mode="marginal",
+            batch_size=2,
+        )
+        expected_support = [[a, b] for a in range(3) for b in range(3)]
+        np.testing.assert_array_equal(agent.unique_multiactions, expected_support)
+        q_pi = jnp.array([[0.4, 0.35, 0.25], [0.1, 0.2, 0.7]])
+        probabilities = jit(lambda q: agent.multiaction_probabilities(q))(q_pi)
+        np.testing.assert_allclose(
+            probabilities,
+            [[0.14, 0.16, 0.10, 0.0, 0.0, 0.0, 0.21, 0.24, 0.15],
+             [0.02, 0.01, 0.07, 0.0, 0.0, 0.0, 0.18, 0.09, 0.63]],
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(probabilities.sum(axis=-1), 1.0, atol=1e-6)
+        selected = agent.sample_action(q_pi)
+        np.testing.assert_array_equal(selected, [[2, 1], [2, 2]])
+        # The first tuple is absent from the policies but genuinely available
+        # to the existing independent marginal sampler.
+        for action in np.asarray(selected):
+            self.assertEqual(np.all(np.asarray(agent.unique_multiactions) == action, axis=-1).sum(), 1)
+
+    def test_jitted_constructor_retains_dynamic_normalization_guards(self):
+        @jit
+        def construct(A, B):
+            agent = Agent(A=[A], B=[B])
+            return agent.A[0], agent.B[0]
+
+        A = jnp.array([[0.9, 0.1], [0.1, 0.9]])
+        B = jnp.eye(2)[..., None]
+        actual_A, actual_B = construct(A, B)
+        np.testing.assert_array_equal(actual_A, A[None])
+        np.testing.assert_array_equal(actual_B, B[None])
+        # All invalid inputs share the compiled valid call's shapes.
+        for bad_A, bad_B in ((2 * A, B), (A, jnp.zeros_like(B)), (A, 2 * B)):
+            with self.subTest(bad_A=bad_A, bad_B=bad_B):
+                with self.assertRaisesRegex(Exception, "sum to zero|sum to 1"):
+                    jtu.tree_map(lambda x: x.block_until_ready(), construct(bad_A, bad_B))
+
+        gradient = grad(
+            lambda logits: construct(nn.softmax(logits, axis=0), B)[0][0, 0, 0]
+        )(jnp.log(A))
+        np.testing.assert_allclose(gradient, [[0.09, 0.0], [-0.09, 0.0]], atol=1e-6)
+
+    def test_absent_actions_allow_A_learning_without_transition_work(self):
+        beliefs = [jnp.array([[[0.8, 0.2], [0.3, 0.7], [0.6, 0.4]]])]
+        observations = [jnp.array([[0, 1, 0]])]
+        expected_pA = np.array([[[3.4, 2.6], [2.3, 2.7]]])
+        for algo in ("fpi", "mmp", "vmp", "ovf", "exact"):
+            for learn_B in (False, True):
+                for empty_actions in (False, True):
+                    with self.subTest(algo=algo, learn_B=learn_B, empty_actions=empty_actions):
+                        agent = Agent(
+                            A=[jnp.array([[0.9, 0.1], [0.1, 0.9]])],
+                            B=[jnp.array([[0.0, 1.0], [1.0, 0.0]])[..., None]],
+                            pA=[jnp.full((2, 2), 2.0)],
+                            pB=[jnp.full((2, 2, 1), 2.0)],
+                            learn_A=True, learn_B=learn_B,
+                            inference_algo=algo,
+                            use_inductive=True, H=[jnp.array([0.0, 1.0])],
+                        )
+                        actions = jnp.empty((1, 0, 1), dtype=jnp.int32) if empty_actions else None
+
+                        def update(qs, obs):
+                            return agent.infer_parameters(
+                                qs, obs, actions, beliefs_B=qs if learn_B else None
+                            )
+
+                        for update_fn in (update, jit(update)):
+                            updated = update_fn(beliefs, observations)
+                            np.testing.assert_allclose(updated.pA[0], expected_pA, atol=1e-6)
+                            np.testing.assert_array_equal(updated.B[0], agent.B[0])
+                            np.testing.assert_array_equal(updated.pB[0], agent.pB[0])
+                            np.testing.assert_array_equal(updated.I[0], agent.I[0])
+
+    def test_preferences_and_priors_batch_independently_of_model_tensors(self):
+        A = jnp.array([[0.8, 0.2], [0.2, 0.8]])
+        B = jnp.stack([jnp.eye(2), jnp.array([[0.0, 1.0], [1.0, 0.0]])], axis=-1)
+        C = jnp.array([[2.0, -2.0], [-3.0, 3.0]])
+        D = jnp.array([[0.9, 0.1], [0.2, 0.8]])
+        observations = [jnp.array([[0], [0]])]
+        for model_batch in (None, 1, 2):
+            with self.subTest(model_batch=model_batch):
+                model_A = A if model_batch is None else jnp.broadcast_to(A, (model_batch,) + A.shape)
+                model_B = B if model_batch is None else jnp.broadcast_to(B, (model_batch,) + B.shape)
+                agent = Agent(
+                    A=[model_A], B=[model_B], C=[C], D=[D],
+                    batch_size=2, policy_len=2, use_states_info_gain=False,
+                )
+                self.assertEqual(agent.C[0].shape, (2, 2))
+                self.assertEqual(agent.D[0].shape, (2, 2))
+                np.testing.assert_array_equal(agent.C[0], C)
+                np.testing.assert_array_equal(agent.D[0], D)
+                qs = agent.infer_states(observations, agent.D)
+                q_pi, values = agent.infer_policies(qs)
+                for batch in range(2):
+                    single = Agent(
+                        A=[A], B=[B], C=[C[batch]], D=[D[batch]],
+                        policy_len=2, use_states_info_gain=False,
+                    )
+                    single_qs = single.infer_states([observations[0][batch:batch + 1]], single.D)
+                    single_q_pi, single_values = single.infer_policies(single_qs)
+                    np.testing.assert_allclose(qs[0][batch], single_qs[0][0], atol=1e-6)
+                    np.testing.assert_allclose(q_pi[batch], single_q_pi[0], atol=1e-6)
+                    np.testing.assert_allclose(values[batch], single_values[0], atol=1e-6)
+
+    def test_shared_singleton_and_temporal_preferences_are_independent(self):
+        A = jnp.eye(2)
+        B = jnp.stack([jnp.eye(2), jnp.array([[0.0, 1.0], [1.0, 0.0]])], axis=-1)
+        D = jnp.array([0.7, 0.3])
+        C_static = jnp.array([1.0, -1.0])
+        temporal = jnp.array([[2.0, -2.0], [-1.0, 1.0], [0.5, -0.5]])
+        C_cases = (
+            (C_static, jnp.broadcast_to(C_static, (2, 2))),
+            (C_static[None], jnp.broadcast_to(C_static, (2, 2))),
+            (temporal, jnp.broadcast_to(temporal, (2, 3, 2))),
+            (temporal[None], jnp.broadcast_to(temporal, (2, 3, 2))),
+            (jnp.stack([temporal, -temporal]), jnp.stack([temporal, -temporal])),
+        )
+        for C, expected_C in C_cases:
+            for prior in (D, D[None]):
+                with self.subTest(C_shape=C.shape, D_shape=prior.shape):
+                    agent = Agent(
+                        A=[A], B=[B], C=[C], D=[prior],
+                        batch_size=2, policy_len=2, use_states_info_gain=False,
+                    )
+                    np.testing.assert_array_equal(agent.C[0], expected_C)
+                    np.testing.assert_array_equal(agent.D[0], jnp.broadcast_to(D, (2, 2)))
+                    beliefs = [jnp.broadcast_to(D, (2, 1, 2))]
+                    q_pi, values = agent.infer_policies(beliefs)
+                    for batch in range(2):
+                        single = Agent(
+                            A=[A], B=[B], C=[expected_C[batch]], D=[D],
+                            policy_len=2, use_states_info_gain=False,
+                        )
+                        expected_q_pi, expected_values = single.infer_policies([D[None, None]])
+                        np.testing.assert_allclose(q_pi[batch], expected_q_pi[0], atol=1e-6)
+                        np.testing.assert_allclose(values[batch], expected_values[0], atol=1e-6)
+
+    def test_action_axes_are_validated_before_same_product_flattening(self):
+        correct_B = jnp.broadcast_to(jnp.eye(2)[:, :, None, None], (2, 2, 2, 3))
+        kwargs = {
+            "A": [jnp.eye(2)],
+            "B_action_dependencies": [[0, 1]],
+            "num_controls": [2, 3],
+        }
+        for B in (correct_B, correct_B[None]):
+            agent = Agent(B=[B], pB=[jnp.ones_like(B)], **kwargs)
+            self.assertEqual(agent.B[0].shape, (1, 2, 2, 6))
+        permuted_B = jnp.swapaxes(correct_B, -1, -2)
+        with self.assertRaisesRegex(ValueError, r"B\[0\] action dimensions"):
+            Agent(B=[permuted_B], **kwargs)
+        with self.assertRaisesRegex(ValueError, r"pB\[0\] action dimensions"):
+            Agent(B=[correct_B], pB=[jnp.ones_like(permuted_B)], **kwargs)
+
+    def test_one_frame_sequence_prior_propagates_current_posterior(self):
+        B = jnp.array([[0.0, 1.0], [1.0, 0.0]])[..., None]
+        beliefs = [jnp.array([[[0.9, 0.1]]])]
+        action = jnp.array([[0]])
+        for algo in ("mmp", "vmp"):
+            for horizon in (1, 3, None):
+                with self.subTest(algo=algo, horizon=horizon):
+                    agent = Agent(
+                        A=[jnp.full((2, 2), 0.5)], B=[B],
+                        D=[jnp.array([0.6, 0.4])],
+                        inference_algo=algo, inference_horizon=horizon,
+                    )
+                    prior = agent.update_empirical_prior(action, beliefs)
+                    expected = [[0.1, 0.9]] if horizon == 1 else [[0.6, 0.4]]
+                    np.testing.assert_allclose(prior[0], expected, atol=1e-6)
+
+    def test_two_frame_B_context_does_not_duplicate_A_observation(self):
+        previous = jnp.array([0.8, 0.2])
+        current = jnp.array([0.3, 0.7])
+        transition = jnp.array([[0.8, 0.2], [0.2, 0.8]])
+        for algo in ("fpi", "mmp", "vmp", "ovf", "exact"):
+            with self.subTest(algo=algo):
+                agent = Agent(
+                    A=[jnp.full((2, 2), 0.5)], B=[transition[..., None]],
+                    pA=[jnp.full((2, 2), 2.0)], pB=[jnp.full((2, 2, 1), 2.0)],
+                    learn_A=True, learn_B=True, inference_algo=algo,
+                )
+                beliefs_A = [current[None, None]]
+                beliefs_B = [jnp.stack([previous, current])[None]]
+                if algo in ("ovf", "exact"):
+                    predicted = np.asarray(transition) @ np.asarray(previous)
+                    joint = (
+                        np.asarray(transition) * np.asarray(previous)[None, :]
+                        * (np.asarray(current) / predicted)[:, None]
+                    )
+                else:
+                    joint = np.outer(np.asarray(current), np.asarray(previous))
+
+                def update(qs_A, qs_B):
+                    return agent.infer_parameters(
+                        qs_A, [jnp.array([[0]])], jnp.array([[[0]]]),
+                        beliefs_B=qs_B,
+                    )
+
+                for update_fn in (update, jit(update)):
+                    updated = update_fn(beliefs_A, beliefs_B)
+                    np.testing.assert_allclose(
+                        updated.pA[0], [[[2.3, 2.7], [2.0, 2.0]]], atol=1e-6
+                    )
+                    np.testing.assert_allclose(
+                        updated.pB[0][0, ..., 0], 2.0 + joint, atol=1e-6
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()
 

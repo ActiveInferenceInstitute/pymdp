@@ -1,4 +1,3 @@
-import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -68,7 +67,9 @@ def infer_fn(agent: Any, obs: list[jnp.ndarray], qs: list[jnp.ndarray]) -> list[
     agent : Any
         Active inference agent.
     obs : list[jnp.ndarray]
-        Candidate observation(s) for each modality.
+        Integer outcome IDs for each modality, with batch and time axes.
+        The default adapter one-hot encodes these for categorical agents unless
+        the agent owns a custom preprocessor, which receives the integer IDs.
     qs : list[jnp.ndarray]
         Prior/predictive beliefs to condition on for state inference.
 
@@ -77,6 +78,9 @@ def infer_fn(agent: Any, obs: list[jnp.ndarray], qs: list[jnp.ndarray]) -> list[
     list[jnp.ndarray]
         Posterior beliefs over hidden-state factors.
     """
+    if agent.categorical_obs and agent.preprocess_fn is None:
+        obs = [nn.one_hot(o, n) for o, n in zip(obs, agent.num_obs)]
+
     agent_expanded = jtu.tree_map(lambda x: x[None, ...], agent)
     qs_post = agent_expanded.infer_states(obs, qs)
     # remove time dim from qs_post
@@ -126,9 +130,12 @@ def si_policy_search(
     gamma : float, default=1
         Precision/temperature scale used in policy softmax updates.
     topk_obsspace : int, default=10000
-        Maximum observation-combination budget per expansion.
+        Maximum joint observation-combination budget per expansion. Selected
+        per-modality probabilities retain their existing normalization; selected
+        joint branches are not renormalized after truncation or pruning.
     infer_fn : Callable, optional
-        State-inference function used during observation expansion.
+        State-inference function used during observation expansion. Custom
+        callbacks receive integer outcome IDs, independently of `categorical_obs`.
     predict_fn : Callable, optional
         One-step prediction/valuation function for policy expansion.
 
@@ -544,66 +551,68 @@ def _remove_orphans(tree: Tree) -> Tree:
     return tree
 
 
-@partial(jax.jit, static_argnums=(0))
-def _calculate_probabilities(return_size: int, topk_probs: list[jnp.ndarray]) -> jnp.ndarray:
-    """
-    Calculate joint probabilities using stride-based indexing with top-k probabilities.
-    
-    Args:
-        return_size: Number of observation combinations to generate.
-        topk_probs: List of top-k probability arrays, one per modality.
-    """
-    joint_probs = jnp.ones(return_size)
-    
-    # Use topk_probs directly with per-modality k-based stride indexing
-    stride = 1
-    strides = []
-    k_values = [len(probs) for probs in topk_probs]
-    
-    # Calculate strides for each dimension (rightmost changes fastest)
-    for k in reversed(k_values):
-        strides.insert(0, stride)
-        stride *= k
-        
-    # For each modality, select from top-k probabilities
-    for i, (stride, k) in enumerate(zip(strides, k_values)):
-        indices = jnp.arange(return_size)
-        # Convert linear index to top-k coordinate for this modality
-        topk_coords = (indices // stride) % k
-        selected_probs = topk_probs[i][topk_coords]
-        joint_probs = joint_probs * selected_probs
-        
-    return joint_probs
+@partial(jax.jit, static_argnums=(0,))
+def _top_joint_observations(
+    budget: int, observation_probs: list[jnp.ndarray]
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Return at most ``budget`` joint outcomes in descending probability order.
 
+    Merge sorted product rows one modality at a time. Each merge keeps at most
+    ``budget`` prefixes and row heads, never a Cartesian-product buffer. Ties
+    select the first prefix row; per-modality ``top_k`` ties use outcome order.
+    Parent links reconstruct the outcome IDs with O(modalities * budget) storage.
+    Apart from per-modality ``top_k``, selection uses O(modalities * budget**2)
+    work and scans at most ``budget`` candidates per modality.
+    """
+    if budget < 1:
+        raise ValueError("The joint observation budget must be positive.")
 
-@partial(jax.jit, static_argnums=(0, 1))
-def _generate_observations(
-    shapes: list[int], return_size: int, topk_indices: list[jnp.ndarray]
-) -> jnp.ndarray:
-    """
-    Generate observation combinations using stride-based indexing with top-k indices.
-    
-    Args:
-        shapes: Shape of each modality in the observation space.
-        return_size: Number of observation combinations to generate.
-        topk_indices: List of top-k index arrays, one per modality.
-    """
-    combinations = jnp.zeros((return_size, len(shapes)), dtype=jnp.int32)
-    
-    # Generate in top-k space, then map to original indices
-    k_values = [len(indices) for indices in topk_indices]
-    stride = 1
-    
-    for i, k in enumerate(reversed(k_values)):
-        pos = len(shapes) - 1 - i
-        # Generate combinations in [0, k-1] space
-        topk_coords = (jnp.arange(return_size) // stride) % k
-        # Map to original observation indices
-        original_coords = topk_indices[pos][topk_coords]
-        combinations = combinations.at[:, pos].set(original_coords)
-        stride *= k
-        
-    return combinations
+    joint_probs = jnp.ones((1,), dtype=observation_probs[0].dtype)
+    parent_rows = []
+    outcome_ids = []
+
+    for modality_probs in observation_probs:
+        top_probs, top_indices = lax.top_k(
+            modality_probs[0], min(budget, modality_probs.shape[-1])
+        )
+        # Renormalise the top probabilities # TODO: check that this is ok to do
+        # Preserve this per-modality convention, not a joint retained-mass rescale.
+        top_probs = top_probs / jnp.sum(top_probs)
+        candidate_count = min(budget, joint_probs.shape[0] * top_probs.shape[0])
+        ranks = jnp.zeros(joint_probs.shape, dtype=jnp.int32)
+        heads = joint_probs * top_probs[0]
+
+        def select_next(
+            carry: tuple[jnp.ndarray, jnp.ndarray], _: Any
+        ) -> tuple[tuple[jnp.ndarray, jnp.ndarray], tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]]:
+            ranks, heads = carry
+            row = jnp.argmax(heads)
+            rank = ranks[row]
+            probability = heads[row]
+            next_rank = rank + 1
+            next_head = jnp.where(
+                next_rank < top_probs.shape[0],
+                joint_probs[row]
+                * top_probs[jnp.minimum(next_rank, top_probs.shape[0] - 1)],
+                -jnp.inf,
+            )
+            return (
+                ranks.at[row].set(next_rank),
+                heads.at[row].set(next_head),
+            ), (row, top_indices[rank], probability)
+
+        _, (parents, outcomes, joint_probs) = lax.scan(
+            select_next, (ranks, heads), None, length=candidate_count
+        )
+        parent_rows.append(parents)
+        outcome_ids.append(outcomes)
+
+    rows = jnp.arange(joint_probs.shape[0])
+    observations = []
+    for parents, outcomes in reversed(list(zip(parent_rows, outcome_ids))):
+        observations.append(outcomes[rows])
+        rows = parents[rows]
+    return jnp.stack(observations[::-1], axis=-1), joint_probs
 
 
 def optimized_tree_search(
@@ -656,9 +665,11 @@ def optimized_tree_search(
     gamma : float, default=1
         Precision (inverse temperature) for policy softmax updates.
     topk_obsspace : int, default=10000
-        Maximum number of top observation combinations considered per expansion.
+        Maximum joint observation-combination budget per expansion. Per-modality
+        top probabilities retain their existing normalization; joint branches are
+        not renormalized after truncation or pruning.
     infer_fn : Callable, optional
-        Function used to infer posterior states from candidate observations.
+        Function used to infer posterior states from integer candidate outcomes.
     predict_fn : Callable, optional
         Function used to predict next-state/observation beliefs and policy
         scores (`neg_efe = -EFE`).
@@ -687,33 +698,8 @@ def optimized_tree_search(
             qo: list[jnp.ndarray],
             topk_obsspace: int,
         ) -> Tree:
-            """Generate observation combinations with top-k filtering."""
-            shapes = [o.shape[-1] for o in qo]
-            
-            k = topk_obsspace
-            
-            def get_topk_for_factor(factor_probs: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-                # Use effective k to handle cases where k exceeds modality size bc default k is 10000
-                modality_size = factor_probs[0].shape[0]
-                k_effective = min(k, modality_size)
-                # Get top k indices and their probabilities for this modality
-                top_probs, top_indices = jax.lax.top_k(factor_probs[0], k_effective)
-                # Renormalise the top probabilities # TODO: check that this is ok to do
-                top_probs = top_probs / jnp.sum(top_probs)
-                return top_indices, top_probs
-            
-            # Extract top-k data for each modality
-            topk_data = [get_topk_for_factor(factor) for factor in qo]
-            topk_indices = [data[0] for data in topk_data]
-            topk_probs = [data[1] for data in topk_data]
-            
-            # Calculate actual number of combinations based on effective k values
-            k_effective_per_modality = [len(indices) for indices in topk_indices]
-            num_combinations = int(np.prod(k_effective_per_modality))
-            
-            # Generate combinations using refactored helper functions
-            observations = _generate_observations(tuple(shapes), num_combinations, topk_indices)
-            probabilities = _calculate_probabilities(num_combinations, topk_probs)
+            """Generate a bounded, probability-ranked joint observation set."""
+            observations, probabilities = _top_joint_observations(topk_obsspace, qo)
 
             def add_observation_node(
                 tree: Tree, data: tuple[jnp.ndarray, jnp.ndarray]
@@ -1012,8 +998,10 @@ def optimized_tree_search(
                 idx,
             )
 
-        # iterate over all policy children
-        tree, neg_efe_recursive = lax.scan(backward, tree, tree.children_indices[idx])
+        # Only real policy slots participate. Missing real children still receive
+        # the finite prune penalty; structural padding never enters the softmax.
+        policy_children = tree.children_indices[idx, : policies.shape[0]]
+        tree, neg_efe_recursive = lax.scan(backward, tree, policy_children)
 
         # calculate new q_pi and recursive neg_efe
         q_pi = nn.softmax(neg_efe_recursive * gamma, axis=0)
@@ -1029,7 +1017,7 @@ def optimized_tree_search(
 
         # prune children if their q_pi is below the threshold
         prune_mask = q_pi < policy_prune_threshold
-        children_indices = (1-prune_mask) * tree.children_indices[idx] + prune_mask * -1
+        children_indices = jnp.where(prune_mask, -1, policy_children)
 
         # NOTE: We don't renormalise q_pi after pruning because it interferes with the 
         # weighting of gamma in the softmax calculation. The q_pis are still valid 
