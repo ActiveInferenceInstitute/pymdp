@@ -9,6 +9,8 @@ from jax import lax
 from numpyro import deterministic, plate, sample
 from numpyro.contrib.control_flow import scan
 
+from pymdp.inference import SEQUENCE_METHODS
+
 
 def evolve_trials(agent: Any, data: Any) -> Any:
     """Return action probabilities, observations and action vectors for one block.
@@ -21,6 +23,8 @@ def evolve_trials(agent: Any, data: Any) -> Any:
 
     Every call starts at ``agent.D``. Each trial uses the agent's state-inference
     and empirical-prior APIs; no learning or inter-block state carry is added.
+    MMP and VMP require ``inference_horizon=1`` because this routine filters
+    one observation at a time.
 
     Parameters
     ----------
@@ -35,6 +39,9 @@ def evolve_trials(agent: Any, data: Any) -> Any:
         Joint action probabilities, modality observations, and supplied action
         vectors, all stacked along the trial axis.
     """
+    if agent.inference_algo in SEQUENCE_METHODS and agent.inference_horizon != 1:
+        raise ValueError("Observed-action likelihoods with MMP or VMP require inference_horizon=1.")
+
     observations = data.get("observations", data.get("outcomes"))
     if observations is None:
         raise KeyError("Expected `observations` in trial data.")

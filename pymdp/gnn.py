@@ -404,7 +404,7 @@ class FlatPOMDP:
 
         Refuses agents with more than one observation modality, more than one
         hidden-state factor, or a policy prior that is not a single-step habit
-        over actions.
+        over actions. Single-step policy priors are exported in action order.
         """
         num_modalities = int(getattr(agent, "num_modalities", len(agent.A)))
         num_factors = int(getattr(agent, "num_factors", len(agent.B)))
@@ -422,12 +422,29 @@ class FlatPOMDP:
             raise GNNBridgeError(
                 f"Expected a single control factor; got {num_controls}"
             )
+        habits = getattr(agent, "E", None)
+        if habits is not None:
+            habits = _single(habits, "E", expected_ranks=(1,))
+            policies = getattr(agent, "policies", None)
+            try:
+                policy_array = np.asarray(getattr(policies, "policy_arr", policies))
+            except ValueError as error:
+                raise GNNBridgeError("A flat GNN habit prior requires uniform one-step policies.") from error
+            if policy_array.shape != (len(habits), 1, 1):
+                raise GNNBridgeError("A flat GNN habit prior requires one-step policies.")
+            actions = policy_array[:, 0, 0]
+            action_order = np.argsort(actions)
+            if not np.issubdtype(actions.dtype, np.integer) or not np.array_equal(
+                actions[action_order], np.arange(num_controls[0])
+            ):
+                raise GNNBridgeError("A flat GNN habit prior requires one policy per action.")
+            habits = habits[action_order]
         return cls.from_model(
             A=agent.A[0],
             B=agent.B[0],
             C=agent.C[0],
             D=agent.D[0],
-            E=getattr(agent, "E", None),
+            E=habits,
             **kwargs,
         )
 

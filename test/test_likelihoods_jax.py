@@ -112,6 +112,20 @@ def test_blocks_reset_prior_but_trials_propagate_actions(method):
     np.testing.assert_allclose(probs[0, :, 0, 0], expected_action_zero, atol=1e-6)
 
 
+@pytest.mark.parametrize("method", ["mmp", "vmp"])
+@pytest.mark.parametrize("horizon", [2, None])
+def test_two_trial_likelihood_rejects_unsupported_sequence_windows(method, horizon):
+    agent = Agent(
+        A=[jnp.eye(2)],
+        B=[jnp.stack([jnp.eye(2), jnp.array([[0.0, 1.0], [1.0, 0.0]])], -1)],
+        inference_algo=method,
+        inference_horizon=horizon,
+    )
+    data = _data([[[[1]], [[0]]]])
+    with pytest.raises(ValueError, match="require inference_horizon=1"):
+        _density(agent, data)
+
+
 def test_likelihood_gradient_uses_probabilities_not_logits_twice():
     data = _data([[[[0]], [[0]], [[1]]]])
 

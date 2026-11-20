@@ -251,6 +251,35 @@ class TestRefusals(unittest.TestCase):
             )
         self.assertIn("habit prior", str(context.exception))
 
+    def test_from_agent_exports_habit_prior_in_action_order(self):
+        for agent_class, asarray in ((Agent, jnp.asarray), (LegacyAgent, np.asarray)):
+            with self.subTest(agent=agent_class.__name__):
+                A = asarray(np.eye(2))
+                B = asarray(np.stack([np.eye(2), np.eye(2)[:, ::-1]], axis=2))
+                agent = agent_class(
+                    A=[A] if agent_class is Agent else A,
+                    B=[B] if agent_class is Agent else B,
+                    E=asarray([0.9, 0.1]),
+                    policies=asarray([[[1]], [[0]]]),
+                )
+                model = gnn.FlatPOMDP.from_agent(agent)
+                np.testing.assert_allclose(model.E, [0.1, 0.9])
+
+    def test_from_agent_refuses_policies_that_do_not_map_one_to_one_to_actions(self):
+        for policies, reason in (
+            ([[[0], [1]], [[1], [0]]], "one-step"),
+            ([[[0]], [[0]]], "one policy per action"),
+            ([[[0]]], "one policy per action"),
+        ):
+            with self.subTest(policies=policies):
+                agent = Agent(
+                    A=[jnp.eye(2)],
+                    B=[jnp.stack([jnp.eye(2), jnp.eye(2)[:, ::-1]], axis=2)],
+                    policies=jnp.asarray(policies),
+                )
+                with self.assertRaisesRegex(gnn.GNNBridgeError, reason):
+                    gnn.FlatPOMDP.from_agent(agent)
+
     def test_multi_entry_lists_are_refused(self):
         with self.assertRaises(gnn.GNNBridgeError) as context:
             gnn.FlatPOMDP.from_model(
