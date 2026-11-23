@@ -92,7 +92,7 @@ def resolve_b_action_dependencies(
         return [[f] for f in range(num_factors)]
     return B_action_dependencies
 
-def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "tensor") -> None:
+def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "tensor") -> Array:
     """
     Validate that a probability tensor has normalized distributions along a given axis.
 
@@ -107,10 +107,10 @@ def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "ten
 
     Returns
     -------
-    None
-        In eager mode, raises `ValueError` if any distribution along the given
-        axis sums to zero or is not normalized. Under JAX tracing/JIT, invalid
-        distributions are signaled via `eqx.error_if`.
+    Array
+        The validated tensor. Callers must retain the returned value so traced
+        `eqx.error_if` guards remain on the computation path. Eager invalid
+        distributions raise `ValueError`; JIT signals a runtime error.
     """
 
     sums = jnp.sum(tensor, axis=axis)
@@ -120,19 +120,19 @@ def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "ten
     # constructor tests rely on this path. The eager path below avoids the
     # callback-based runtime error mechanism for non-jitted CUDA validation.
     if isinstance(sums, jax.core.Tracer):
-        sums = eqx.error_if(
-            sums,
+        tensor = eqx.error_if(
+            tensor,
             jnp.any(jnp.isclose(sums, 0.0)),
             f"Please ensure that none of the distributions along {tensor_name}'s "
             f"{axis}-th axis sum to zero...",
         )
-        sums = eqx.error_if(
-            sums,
+        tensor = eqx.error_if(
+            tensor,
             jnp.any(~jnp.isclose(sums, 1.0)),
             f"Please ensure that all distributions along {tensor_name}'s {axis}-th "
             "axis are properly normalised and sum to 1...",
         )
-        return
+        return tensor
 
     # This validation runs during eager model construction outside JIT-compiled
     # kernels. Using Python-side checks avoids Equinox's runtime callback path,
@@ -150,6 +150,8 @@ def validate_normalization(tensor: Array, axis: int = 1, tensor_name: str = "ten
             f"Please ensure that all distributions along {tensor_name}'s {axis}-th "
             "axis are properly normalised and sum to 1..."
         )
+
+    return tensor
 
 def random_factorized_categorical(key: Array, dims_per_var: Sequence[int]) -> list[Array]:
     """

@@ -28,6 +28,13 @@ fork-local nightly workflows, the `master` entries in the three CI branch
 lists, and the GNN bridge. Never rewrite upstream code paths to make a
 fork-local feature fit.
 
+The explicit 2026-11-13 group19 assignment permits correctness repairs to
+preserved upstream-inherited source and associated documentation. This is a
+bounded exception, not a changed default. Acceptance requires the parent's
+source-bound GitVault test receipts; publication and upstream forwarding stay
+with the authorized integration owner. P2, P9 and P16 scientific/semantic
+decisions, pins, and external prerequisites are not waived.
+
 ## Upstream sync
 
 `upstream` points at `infer-actively/pymdp` with `pushurl` set to `DISABLED`,

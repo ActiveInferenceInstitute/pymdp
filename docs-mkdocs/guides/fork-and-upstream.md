@@ -7,8 +7,12 @@
 
 ## What the fork adds
 
-Fork-local changes stay additive so that merges from `upstream/main` remain
-clean. The delta is:
+The default policy is additive fork-local work, keeping upstream merges small.
+The explicit 2026-11-13 group19 correctness-repair exception covers the
+preserved source repairs and associated documentation, with source-bound
+qualification returned to the parent integration owner. Upstream forwarding
+remains an owner decision, not a new general permission to diverge. The
+original additive delta is:
 
 - the `.aii/` InstituteOS sidecar metadata;
 - `TASKS.md` operator task discovery;
@@ -19,7 +23,8 @@ clean. The delta is:
 - fork-local nightly workflows and the `master` entries in the CI branch lists;
 - the upstream sync convention in `AGENTS.md`.
 
-The fork does not rewrite upstream code paths to make a fork-local feature fit.
+Outside that explicit correctness exception, fork-local features must not
+rewrite upstream paths merely to make the feature fit.
 
 ## How the fork stays in sync
 
@@ -32,15 +37,20 @@ checkout ref and takes upstream's step-level changes on top.
 
 ## Checking the current delta
 
+The following setup is for a fresh clone only. Preserve existing remotes;
+actual remote mutation/fetch requires separate repository-owner authorization.
+
 ```bash
+git remote add upstream https://github.com/infer-actively/pymdp.git
+git remote set-url --push upstream DISABLED
 git fetch upstream main
 git log --oneline master ^upstream/main
 git diff --stat upstream/main master
 ```
 
-At the time of writing the fork is 16 commits ahead of and 1 commit behind
-`upstream/main`; the upstream-only commit is `c8be101`
-(`fix(graph_worlds): reject partial or mismatched batch locations`).
+Historical synchronization at fork `978f967` versus upstream `85fde61`
+recorded 28 fork-only and zero upstream-only commits. This is not a claim
+about current divergence.
 
 ## The measured documentation gaps are upstream's
 
@@ -68,5 +78,6 @@ divergence. The fork's own documentation surfaces are listed under
 The upstream-inherited documentation trees (`docs-mkdocs/`, `examples/`,
 `pymdp/`, `scripts/`, `test/`, `paper/`) are owned upstream. The fork's own
 surfaces are the sidecar, the GNN bridge guides, `TASKS.md`, and the fork notes
-in `AGENTS.md` and `README.md`. When a change touches an upstream-inherited
-path, prefer sending it upstream; keep fork-local fixes additive.
+in `AGENTS.md` and `README.md`. Prefer forwarding upstream-inherited repairs
+upstream; the 2026-11-13 correctness exception does not decide publication or
+upstream acceptance.

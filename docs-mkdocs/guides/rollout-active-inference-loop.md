@@ -61,6 +61,11 @@ last, info = rollout_jit(
 
 - `agent.batch_size` controls parallel batch dimension.
 - `initial_carry` can override auto-initialized state (for warm-starting).
+- At inference horizon one, `learning_qs` and its aligned transition action
+  survive separately from the truncated inference history.
+- Warm starts derive missing learning context from the supplied `qs`.
+  Longer-window learning sufficient-statistic accounting remains the separate
+  P2 scientific decision; this repair does not select that policy.
 
 ## Relationship to manual loops
 

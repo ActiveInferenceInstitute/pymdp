@@ -1,7 +1,8 @@
 # TODO — pymdp
 
-Owner-facing backlog for the `ActiveInferenceInstitute/pymdp` fork. Grouped by
-kind; every item below is verified against the current tree. Planning signposts
+Owner-facing backlog for the `ActiveInferenceInstitute/pymdp` fork.
+The dated observations below are historical, not recertification of today's
+working tree. Planning signposts
 also live in [`TASKS.md`](TASKS.md).
 
 Measured 2026-11-12 on `master` at `978f967` (the 1.0.5 sync) with
@@ -9,6 +10,26 @@ Measured 2026-11-12 on `master` at `978f967` (the 1.0.5 sync) with
 organisation's GitHub Actions billing is locked, so e.g. run `43281561063` on
 that commit failed in 2 s with no executed steps — and every number below is a
 local `./gate.sh` measurement.
+
+## 2026-11-13 source-only correctness qualification
+
+Focused parent-governed runs exercised Agent batching/action support,
+normalization, one-frame VMP, horizon-one rollout learning context, SI,
+observed-action likelihoods, gate dispatch and metrics input binding.
+Qualification corrected two test invocation/indexing contracts without
+changing inference equations. Exact-pin source-mode GNN proof at v5.1.0
+reported 29 passed plus 19 subtests, with no skips; installed-origin,
+publication, and full-suite claims remain separate.
+
+The detailed parent receipt set is `resume-qualification-rl-result.json`,
+including retained initial failures and narrow corrective proofs.
+
+- [ ] P2: longer-window sufficient-statistic accounting needs scientific approval.
+- [ ] P9: rank-two temporal/per-agent ambiguity remains; explicit rank-three C is available.
+- [ ] P16: temporal-policy semantics at the unchanged GNN pin remain unqualified.
+- [ ] Real metrics regeneration and docs/all freshness enforcement need owner disposition.
+- [ ] URL/badge presentation, Python floor, Graphviz and hosted billing remain owner/prerequisite boundaries.
+- [ ] Independent review, integration and upstream forwarding remain owner-managed.
 
 ## Upstream sync
 
@@ -78,10 +99,10 @@ local `./gate.sh` measurement.
 
 ## Known defects
 
-- [ ] **The generated gate-metrics page is stale and nothing checks it.**
+- [ ] **Regenerate gate metrics after final inputs settle; choose freshness enforcement.**
   [`docs-mkdocs/development/gate-metrics.md`](docs-mkdocs/development/gate-metrics.md)
   records inputs digest `6365024357e0174e`, `test` = 351 selected / 346 passed
-  / 5 skipped and `gnn` = 13 passed / 5 skipped. On `978f967` today,
+  / 5 skipped and `gnn` = 13 passed / 5 skipped. Historically, on `978f967`,
   `uv run --no-sync python scripts/gate_metrics.py --check` exits 1 —
   "inputs digest 6365024357e0174e does not match the tree (8671c0199c5326c5);
   re-run ./gate.sh bench" — while `./gate.sh test` selects 364 (358 passed, 6
@@ -90,11 +111,11 @@ local `./gate.sh` measurement.
   in practice: no arm or workflow calls it (`git grep -n gate_metrics --
   gate.sh .github` finds only the `bench` arm forwarding `"$@"`). Its recorded
   `Repository commit 0bea4154…` is not itself a defect — PR #7 squashed that
-  commit away and the generator documents the SHA as provenance only. Fix: run
-  `./gate.sh bench` on `master`, and decide whether `docs` (or `all`) should run
-  `--check` so the page cannot drift again. Owner: repository maintainer. Lint
-  debt and test failures stay reported by the gate (`./gate.sh lint`,
-  `./gate.sh test`) and are not tracked here as a standing list.
+  commit away and the generator documents the SHA as provenance only.
+  The repaired producer binds working inputs, modes, and lock contents and
+  refuses drift. This does not refresh the generated page: an authorized real
+  producer run is still required. The maintainer must decide whether `docs`
+  or `all` enforces freshness. Do not hand-edit digests, timings or counts.
 
 ## Owner decisions
 

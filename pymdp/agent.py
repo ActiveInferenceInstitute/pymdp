@@ -3,6 +3,7 @@
 
 """Agent API for Active Inference with the modern JAX backend."""
 import math as pymath
+import itertools
 import warnings
 import jax.numpy as jnp
 import jax.tree_util as jtu
@@ -55,6 +56,16 @@ class Agent(Module):
     agent or per `infer_states` call). If provided, this function should
     return categorical observations and takes precedence over default
     discrete/categorical handling.
+
+    Model batching
+    --------------
+    Preferences `C` and priors `D` are batched independently of `A` and `B`.
+    Shared vectors and singleton batches broadcast across agents. Temporal
+    preferences can be explicitly shaped `(batch, time, num_obs)`. A rank-two
+    `C` whose first dimension is 1 or `batch_size` retains its batched-static
+    interpretation; otherwise it is shared temporal `(time, num_obs)`.
+    When time and batch lengths coincide, use rank three to express temporal
+    preferences rather than relying on that unresolved rank-two ambiguity.
     """
 
     A: list[Array]
@@ -254,8 +265,6 @@ class Agent(Module):
                     A[m] = jnp.broadcast_to(a_m, (batch_size,) + a_m.shape[1:])
                     if pA is not None:
                         pA[m] = jnp.broadcast_to(pA[m], (batch_size,) + a_m.shape[1:])
-                    if C is not None:
-                        C[m] = jnp.broadcast_to(C[m], (batch_size,) + C[m].shape[1:])
                 elif a_m.shape[0] != batch_size:
                     raise ValueError(
                         f"Batch size {batch_size} does not match the first dimension of A[{m}] with shape {a_m.shape}"
@@ -264,8 +273,6 @@ class Agent(Module):
                 A[m] = jnp.broadcast_to(a_m, (batch_size,) + a_m.shape)
                 if pA is not None:
                     pA[m] = jnp.broadcast_to(pA[m], (batch_size,) + a_m.shape)
-                if C is not None:
-                    C[m] = jnp.broadcast_to(C[m], (batch_size,) + C[m].shape)
         
         for f, b_f in enumerate(B):
             b_f_state_factors = tuple([self.num_states[f] for f in self.B_dependencies[f]])
@@ -274,8 +281,6 @@ class Agent(Module):
                     B[f] = jnp.broadcast_to(b_f, (batch_size,) + b_f.shape[1:])
                     if pB is not None:
                         pB[f] = jnp.broadcast_to(pB[f], (batch_size,) + b_f.shape[1:])
-                    if D is not None:
-                        D[f] = jnp.broadcast_to(D[f], (batch_size,) + D[f].shape[1:])
                 elif b_f.shape[0] != batch_size:
                     raise ValueError(
                         f"Batch size {batch_size} does not match the first dimension of B[{f}] with shape {b_f.shape}"
@@ -284,8 +289,6 @@ class Agent(Module):
                 B[f] = jnp.broadcast_to(b_f, (batch_size,) + b_f.shape)
                 if pB is not None:
                     pB[f] = jnp.broadcast_to(pB[f], (batch_size,) + b_f.shape)
-                if D is not None:
-                    D[f] = jnp.broadcast_to(D[f], (batch_size,) + D[f].shape)
 
         # now that shapes of A/B have been made consistent and have (batch_size,)-sized leading dimension applied, we can infer num_obs from the first dimension of A
         self.num_obs = [a_m.shape[1] for a_m in A] # dimensions of observations for each modality
@@ -348,9 +351,48 @@ class Agent(Module):
 
         if C is None:
             C = [jnp.ones((self.batch_size, self.num_obs[m])) / self.num_obs[m] for m in range(self.num_modalities)]
+        else:
+            C_batched = []
+            for m, c_m in enumerate(C):
+                if c_m.ndim == 1:
+                    c_m = jnp.broadcast_to(c_m, (batch_size,) + c_m.shape)
+                elif c_m.ndim == 2:
+                    # A leading batch dimension retains its existing static-C
+                    # meaning. If it also equals the temporal length, callers
+                    # must use rank three to express batched temporal preferences.
+                    if c_m.shape[0] in (1, batch_size):
+                        c_m = jnp.broadcast_to(c_m, (batch_size,) + c_m.shape[1:])
+                    else:
+                        c_m = jnp.broadcast_to(c_m, (batch_size,) + c_m.shape)
+                elif c_m.ndim == 3 and c_m.shape[0] in (1, batch_size):
+                    c_m = jnp.broadcast_to(c_m, (batch_size,) + c_m.shape[1:])
+                else:
+                    raise ValueError(
+                        f"C[{m}] must be a shared vector, batched static preferences, "
+                        "or shared/batched temporal preferences"
+                    )
+                if c_m.shape[-1] != self.num_obs[m]:
+                    raise ValueError(f"C[{m}] must have {self.num_obs[m]} observation entries")
+                C_batched.append(c_m)
+            C = C_batched
     
         if D is None:
             D = [jnp.ones((self.batch_size, self.num_states[f])) / self.num_states[f] for f in range(self.num_factors)]
+        else:
+            D_batched = []
+            for f, d_f in enumerate(D):
+                if d_f.ndim == 1:
+                    d_f = jnp.broadcast_to(d_f, (batch_size,) + d_f.shape)
+                elif d_f.ndim == 2 and d_f.shape[0] in (1, batch_size):
+                    d_f = jnp.broadcast_to(d_f, (batch_size,) + d_f.shape[1:])
+                else:
+                    raise ValueError(
+                        f"D[{f}] must have shape (num_states,) or (batch_size, num_states)"
+                    )
+                if d_f.shape[-1] != self.num_states[f]:
+                    raise ValueError(f"D[{f}] must have {self.num_states[f]} state entries")
+                D_batched.append(d_f)
+            D = D_batched
 
         if E is None:
             E = jnp.ones((self.batch_size, self.policies.num_policies)) / self.policies.num_policies
@@ -421,8 +463,17 @@ class Agent(Module):
 
     @property
     def unique_multiactions(self) -> Array:
-        size = pymath.prod(self.num_controls)
-        return jnp.unique(self.policies.policy_arr[:, 0], axis=0, size=size, fill_value=-1)
+        """Action tuples indexing :meth:`multiaction_probabilities`.
+
+        Full sampling uses unique first-step policy tuples. Marginal sampling
+        independently selects from every control factor's action space, so its
+        Cartesian support retains zero-probability tuples as well.
+        """
+        if self.sampling_mode == "marginal":
+            first_actions = list(itertools.product(*(range(n) for n in self.num_controls)))
+        else:
+            first_actions = sorted({policy[0] for policy in self.policies._policy_tup})
+        return jnp.asarray(first_actions, dtype=self.policies._dtype)
 
     def _get_num_states_from_B(self, B: list[Array], B_dependencies: list[list[int]]) -> list[int]:
         """ Use the shapes of B and the B_dependencies to determine the number of states for each factor."""
@@ -454,16 +505,18 @@ class Agent(Module):
         Parameters
         ----------
         beliefs_A: list[Array]
-            Marginal state beliefs used when updating the observation model
-            parameters.
+            Marginal state beliefs aligned with the observations used for `A`
+            learning, shaped `(batch, T_A, num_states)` per factor.
         observations: list[Array]
             Observation histories for each modality.
         actions: Array or None
-            Action history aligned to time. For multi-action agents this should be
-            shaped `(batch, T, num_factors)`.
+            Action history aligned to time, shaped `(batch, T_B-1, num_factors)`.
+            If structurally absent (`None`), A learning still proceeds without
+            tracing smoothing or B updates.
         beliefs_B: list[Array] | None, optional
-            Optional sequence of beliefs used for transition updates. If `None`,
-            transition updates are skipped.
+            Optional transition-learning belief sequence. If `None`, use
+            `beliefs_A`. A longer B sequence can retain previous-frame context;
+            smoothed A marginals then use only the observation-aligned suffix.
         lr_pA: float, default=1.0
             Learning-rate multiplier for `A` updates.
         lr_pB: float, default=1.0
@@ -510,11 +563,13 @@ class Agent(Module):
         # A handy predicate: can we (meaningfully) apply sequence-based smoothing or
         # B-joint construction for this update window?
         # We need at least one valid transition.
-        can_update_Beliefs = (
+        has_transition_context = (
             actions_Tm1 is not None
             and (T > 1)
             and (actions_Tm1.shape[1] == (T - 1))
-            and jnp.any(valid_transition_mask)
+        )
+        can_update_Beliefs = (
+            jnp.any(valid_transition_mask) if has_transition_context else False
         )
 
         # Full B-parameter update additionally requires `self.learn_B`.
@@ -554,7 +609,10 @@ class Agent(Module):
                 for f in range(self.num_factors)
             ]
 
-        def _smooth_or_fallback(smoothing_fn: Callable[..., Any]) -> tuple[list[Array], list[Array]]:
+        def _smooth_or_fallback(smoothing_fn: Callable[..., Any]) -> tuple[list[Array], list[Array] | None]:
+            if not has_transition_context:
+                return beliefs_A, None
+
             def update_with_smoothing(_: Any) -> tuple[list[Array], list[Array]]:
                 # Use the *sequence* of filtered beliefs (seq_beliefs) for smoothing
                 #   vmap runs over batch: each call sees (T, Ns_f) and (T-1, Nu)
@@ -587,10 +645,19 @@ class Agent(Module):
                 # Exact backward smoothing from online filtering history for single-factor HMMs.
                 smoothing_fn = inference.smoothing_exact
             marginal_beliefs, joint_beliefs = _smooth_or_fallback(smoothing_fn)
+            # B can use a previous/current pair while A has only the current
+            # observation (notably a one-frame rollout inference window).
+            if has_transition_context and T != beliefs_A[0].shape[1]:
+                marginal_beliefs = jtu.tree_map(
+                    lambda x: x[:, -beliefs_A[0].shape[1]:], marginal_beliefs
+                )
         else:
             # Non-OVF: keep existing behavior (use filtered marginals and build joints from t and t-1)
             marginal_beliefs = beliefs_A
-            joint_beliefs = _apply_transition_mask(_build_outer_product_joints()) if self.learn_B else None
+            joint_beliefs = (
+                _apply_transition_mask(_build_outer_product_joints())
+                if self.learn_B and has_transition_context else None
+            )
 
         if self.learn_A:
             update_A = partial(
@@ -611,7 +678,7 @@ class Agent(Module):
             
             agent = tree_at(lambda x: (x.A, x.pA), agent, (E_qA, qA))
             
-        if self.learn_B:
+        if self.learn_B and has_transition_context:
             update_B = partial(learning.update_state_transition_dirichlet, num_controls=self.num_controls)
             lrB = jnp.broadcast_to(lr_pB, (self.batch_size,))
 
@@ -675,10 +742,10 @@ class Agent(Module):
         (or per-call `preprocess_fn`) to keep those paths consistent.
         """
         if self.preprocess_fn is not None:
-            return self.preprocess_fn(observations)
+            return list(self.preprocess_fn(observations))
 
         if self.categorical_obs:
-            return observations
+            return list(observations)
 
         return self.make_categorical(observations)
 
@@ -799,7 +866,7 @@ class Agent(Module):
         if preprocess_fn is None:
             o_vec = self.process_obs(observations)
         else:
-            o_vec = preprocess_fn(observations)
+            o_vec = list(preprocess_fn(observations))
 
         if not isinstance(empirical_prior, (list, tuple)):
             raise ValueError(
@@ -812,6 +879,7 @@ class Agent(Module):
 
         A = self.A
         if mask is not None:
+            A = list(A)
             for i, m in enumerate(mask):
                 o_vec[i] = m * o_vec[i] + (1 - m) * jnp.ones_like(o_vec[i]) / self.num_obs[i]
                 A[i] = m * A[i] + (1 - m) * jnp.ones_like(A[i]) / self.num_obs[i]
@@ -863,11 +931,13 @@ class Agent(Module):
         -------
         pred: list[Array]
             Predicted prior over hidden states for the next inference step.
-            For sequence methods (`mmp`, `vmp`), this returns `self.D` to preserve sequence-inference semantics.
+            For sequence methods (`mmp`, `vmp`) with windows longer than one
+            frame, this returns `self.D` to preserve sequence-inference semantics.
         """
         # this computation of the predictive prior is correct only for fully factorised Bs.
-        if self.inference_algo in inference.SEQUENCE_METHODS:
-            # in the case of the 'mmp' or 'vmp' we have to use D as prior parameter for infer states
+        if self.inference_algo in inference.SEQUENCE_METHODS and self.inference_horizon != 1:
+            # Longer sequence windows use their initial prior; a one-frame
+            # window instead needs the current posterior propagated forward.
             pred = self.D
         else:
             qs_last = jtu.tree_map( lambda x: x[:, -1], qs)
@@ -931,7 +1001,7 @@ class Agent(Module):
     
     def multiaction_probabilities(self, q_pi: Array) -> Array:
         """
-        Compute probabilities of unique multi-actions from the posterior over policies.
+        Compute multi-action probabilities in :attr:`unique_multiactions` order.
 
         Parameters
         ----------
@@ -946,14 +1016,21 @@ class Agent(Module):
             `(batch_size, num_multiactions)`.
         """
 
+        support = self.unique_multiactions
         if self.sampling_mode == "marginal":
-            get_marginals = partial(control.get_marginals, policies=self.policies.policy_arr, num_controls=self.num_controls)
-            outer = lambda a, b: jnp.outer(a, b).reshape(-1)
-            marginals = vmap(lambda x: jtu.tree_reduce(outer, get_marginals(x)))(q_pi)
+            get_marginals = partial(
+                control.get_marginals,
+                policies=self.policies.policy_arr,
+                num_controls=self.num_controls,
+            )
+            factor_marginals = vmap(get_marginals)(q_pi)
+            marginals = jnp.ones((q_pi.shape[0], support.shape[0]), dtype=q_pi.dtype)
+            for f, factor_probs in enumerate(factor_marginals):
+                marginals = marginals * factor_probs[:, support[:, f]]
 
         elif self.sampling_mode == "full":
             locs = jnp.all(
-                self.policies.policy_arr[:, 0] == jnp.expand_dims(self.unique_multiactions, -2),
+                self.policies.policy_arr[:, 0] == jnp.expand_dims(support, -2),
                 -1,
             )
             get_marginals = lambda x: jnp.where(locs, x, 0.).sum(-1)
@@ -1103,7 +1180,6 @@ class Agent(Module):
         else:
             B_dependencies = utils.resolve_b_dependencies(self.num_factors)
 
-        """TODO: check B action shape"""
         if B_action_dependencies is not None:
             B_action_dependencies = B_action_dependencies
         else:
@@ -1140,6 +1216,17 @@ class Agent(Module):
                 continue
 
             dims = [self.num_controls_multi[d] for d in action_dependency]
+            expected_dims = tuple(dims)
+            if B_f.shape[-len(dims):] != expected_dims:
+                raise ValueError(
+                    f"B[{i}] action dimensions {B_f.shape[-len(dims):]} do not "
+                    f"match B_action_dependencies dimensions {expected_dims}"
+                )
+            if pB is not None and pB[i].shape[-len(dims):] != expected_dims:
+                raise ValueError(
+                    f"pB[{i}] action dimensions {pB[i].shape[-len(dims):]} do not "
+                    f"match B_action_dependencies dimensions {expected_dims}"
+                )
             target_shape = list(B_f.shape)[: -len(action_dependency)] + [pymath.prod(dims)]
             B_flat.append(B_f.reshape(target_shape))
             if pB is not None:
@@ -1239,7 +1326,7 @@ class Agent(Module):
             ), f"Please input an `A_dependencies` whose {m}-th indices correspond to the hidden state factors that line up with lagging dimensions of A[{m}]..."
             
             # validate A tensor is normalised
-            utils.validate_normalization(self.A[m], axis=1, tensor_name=f"A[{m}]")
+            self.A[m] = utils.validate_normalization(self.A[m], axis=1, tensor_name=f"A[{m}]")
             
             if self.pA is not None:
                 assert (
@@ -1257,7 +1344,7 @@ class Agent(Module):
             ), f"Please input a `B_dependencies` whose {f}-th indices pick out the hidden state factors that line up with the all-but-final lagging dimensions of B[{f}]..."
             
             # validate B tensor is normalised
-            utils.validate_normalization(self.B[f], axis=1, tensor_name=f"B[{f}]")
+            self.B[f] = utils.validate_normalization(self.B[f], axis=1, tensor_name=f"B[{f}]")
             
             if self.pB is not None:
                 assert (

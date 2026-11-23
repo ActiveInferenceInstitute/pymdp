@@ -10,8 +10,9 @@ the same arms, so a command is defined once and never re-typed in CI.
 ./gate.sh help      # every arm
 ```
 
-Arguments after the arm are forwarded to the tool, e.g.
-`./gate.sh test -- --cov=pymdp --cov-report=term`.
+One optional leading `--` after the arm is consumed; remaining arguments are
+forwarded, e.g. `./gate.sh test -- --cov=pymdp --cov-report=term`.
+The notebook runner's own internal separator is retained.
 
 ## Install the test environment
 
@@ -38,7 +39,7 @@ chooses the interpreter for the `package` arm's throwaway environment (default
 | `test` | The unit gate: `nightly`-marked tests deselected. | `Test` (matrix) |
 | `test-full` | Every pytest test, nothing deselected. | manual |
 | `test-nightly` | Only the `nightly`-marked tests. | `Nightly Tests` |
-| `gnn` | GNN bridge tests; the pinned-parser and executor cases skip unless `PYMDP_GNN_ROOT` is set. | local / opt-in |
+| `gnn` | Shared pinned reader plus bridge/parser/executor tests; exports the pinned source if no explicit root is selected. | local / opt-in |
 | `notebooks` | The CI-tier notebook manifest. | `Test` |
 | `notebooks-nightly` | The nightly-tier notebook manifest. | `Nightly Tests` |
 | `docs` | Curated-notebook sync, then `mkdocs build --strict`. | `Docs` |
@@ -116,8 +117,11 @@ mirror and the pin to agree.
 ```bash
 PYMDP_GNN_CHECKOUT=/path/to/Generalized_Notation_Notation ./gate.sh gnn
 # or point the arm at a tree you exported yourself:
-#   git -C "$GNN_CHECKOUT" archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C /tmp/gnn-pin
-PYMDP_GNN_ROOT=/tmp/gnn-pin/src ./gate.sh gnn
+GNN_EXPORT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
+git -C /path/to/Generalized_Notation_Notation \
+  archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src |
+  tar -x -C "$GNN_EXPORT_ROOT"
+PYMDP_GNN_ROOT="$GNN_EXPORT_ROOT/src" ./gate.sh gnn
 ```
 
 The arm exports the pinned revision from `PYMDP_GNN_CHECKOUT` (default: a
@@ -126,6 +130,9 @@ unset, so `./gate.sh gnn` always runs the reader and the pinned-parser tests
 against the revision the pin names instead of skipping. The emission, refusal,
 and shape tests also run under `./gate.sh test` without any GNN tree. See
 [`../guides/gnn-interoperability.md`](../guides/gnn-interoperability.md).
+
+Each automatic export gets a fresh `.cache/gnn-pin.*` directory. Existing
+exports, including `.cache/gnn-pin`, remain untouched.
 
 ## Lint
 
@@ -140,9 +147,11 @@ entry point, so a hook run and a CI run cannot diverge.
 ./gate.sh docs
 ```
 
-This syncs the curated notebooks and runs the strict mkdocs build
-(`strict: true`), which fails on broken internal links and on nav entries that
-point at missing files. Add a new page to `mkdocs.yml` `nav` as well.
+This syncs curated notebooks and runs the strict, no-sync MkDocs build in the
+prepared environment. Options are forwarded, including
+`./gate.sh docs -- --site-dir "/path/site with spaces"`.
+Broken internal links and missing nav targets fail; add new pages to
+`mkdocs.yml` `nav` as well. This command does not authorize environment changes.
 
 ## Packaging
 

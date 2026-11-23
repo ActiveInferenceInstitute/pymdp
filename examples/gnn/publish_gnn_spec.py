@@ -75,9 +75,10 @@ def main() -> int:
         print(
             f"\n{gnn.GNN_SOURCE_ENV} is not set; skipping parser validation.\n"
             "Export the pinned tree and retry, for example:\n"
-            "  git -C <gnn-checkout> archive "
-            f"{gnn.GNN_PINNED_REVISION} src | tar -x -C /tmp/gnn-pin\n"
-            f"  {gnn.GNN_SOURCE_ENV}=/tmp/gnn-pin/src "
+            '  export_root="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"\n'
+            "  git -C /path/to/Generalized_Notation_Notation archive "
+            f'{gnn.GNN_PINNED_REVISION} src | tar -x -C "$export_root"\n'
+            f'  {gnn.GNN_SOURCE_ENV}="$export_root/src" '
             "uv run python examples/gnn/publish_gnn_spec.py"
         )
         return 0

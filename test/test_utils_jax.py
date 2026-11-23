@@ -12,6 +12,7 @@ import itertools
 import numpy as np
 from jax import numpy as jnp
 from jax import random as jr
+from jax import jit, grad
 
 from pymdp import utils as jax_utils
 from pymdp.legacy import utils as legacy_utils
@@ -208,7 +209,10 @@ class TestUtils(unittest.TestCase):
         # shape: (batch=2, num_obs[m]=3, num_states=[4])
         tensor = jnp.ones((2, 3, 4)) / 3.0  # sums to 1 along axis=1
         # should not raise
-        jax_utils.validate_normalization(tensor, axis=1, tensor_name="test_tensor")
+        self.assertIs(
+            jax_utils.validate_normalization(tensor, axis=1, tensor_name="test_tensor"),
+            tensor,
+        )
 
     def test_validate_normalization_zero_filled_raises(self):
         """
@@ -238,6 +242,23 @@ class TestUtils(unittest.TestCase):
         # should fail on axis=1 (each row sums to 2/3)
         with self.assertRaises(ValueError):
             jax_utils.validate_normalization(t, axis=1, tensor_name="axis1_bad")
+
+    def test_validate_normalization_retains_JIT_guards_on_returned_tensor(self):
+        validate = jit(
+            lambda tensor: jax_utils.validate_normalization(
+                tensor, axis=1, tensor_name="dynamic_tensor"
+            )
+        )
+        tensor = jnp.full((2, 3, 4), 1.0 / 3.0)
+        np.testing.assert_array_equal(validate(tensor), tensor)
+        for bad in (jnp.zeros_like(tensor), 2 * tensor):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(Exception, "sum to zero|sum to 1"):
+                    validate(bad).block_until_ready()
+        gradient = grad(
+            lambda value: jax_utils.validate_normalization(value, axis=1).sum()
+        )(tensor)
+        np.testing.assert_array_equal(gradient, jnp.ones_like(tensor))
 
     def test_create_controllable_B_matches_legacy(self):
         """`create_controllable_B` should reproduce the legacy construction semantics"""

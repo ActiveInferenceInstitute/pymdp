@@ -93,8 +93,37 @@ def update_parameters_online(
     learning_actions: Array | None = None,
     learning_beliefs: list[Array] | None = None,
 ) -> Agent:
+    """Apply online window updates, retaining inter-frame learning context.
+
+    Longer windows retain the existing whole-window accumulation estimator;
+    this helper does not resolve accounting for overlapping windows.
+    """
     # `qs_prev` must remain available here: we need it to construct temporal
     # belief pairs for transition learning and smoothing windows.
+    if learning_actions is not None and learning_actions.shape[1] == 0:
+        # A one-frame inference window has no internal transitions, but the
+        # previous posterior/action still identifies a real inter-frame pair.
+        observations_for_learning = (
+            observation if learning_observations is None else learning_observations
+        )
+        previous_beliefs = qs_prev if learning_beliefs is None else learning_beliefs
+        beliefs_B = (
+            jtu.tree_map(
+                lambda prev, current: jnp.concatenate(
+                    [prev[:, -1:, ...], current[:, -1:, ...]], axis=1
+                ),
+                previous_beliefs,
+                qs,
+            )
+            if agent.learn_B else None
+        )
+        return agent.infer_parameters(
+            qs,
+            observations_for_learning,
+            jnp.expand_dims(action_prev, 1),
+            beliefs_B=beliefs_B,
+        )
+
     if agent.inference_algo in SEQUENCE_METHODS:
         observations_for_learning = (
             observation if learning_observations is None else learning_observations
@@ -174,7 +203,16 @@ def _compute_sequence_empirical_prior_next(
     empirical_prior: list[Array],
     valid_steps: Array,
     history_len: int,
+    action_next: Array,
 ) -> list[Array]:
+    if history_len == 1:
+        qs_current = jtu.tree_map(lambda x: x[:, -1, ...], qs_window)
+        propagate = partial(
+            control.compute_expected_state,
+            B_dependencies=updated_agent.B_dependencies,
+        )
+        return vmap(propagate)(qs_current, updated_agent.B, action_next)
+
     def _shift_empirical_prior(_: Any) -> list[Array]:
         qs_window_start = jtu.tree_map(lambda x: x[:, 0, ...], qs_window)
         action_window_start = action_hist[:, 0, :]
@@ -203,6 +241,7 @@ def _run_sequence_fixed_window_step(
     history_len: int,
     rng_key: Array,
     policy_search: Callable[[Agent, list[Array], Array], tuple[Array, dict[str, Array]]],
+    learning_beliefs: list[Array] | None = None,
 ) -> tuple[Agent, Array, list[Array], dict[str, Any], list[Array], list[Array], list[Array]]:
     updated_agent, action_next, qs, xtra = infer_and_plan(
         agent,
@@ -216,6 +255,7 @@ def _run_sequence_fixed_window_step(
         learning_observations=observation_hist,
         learning_actions=action_hist,
         valid_steps=valid_steps,
+        learning_beliefs=learning_beliefs,
     )
     qs_carry = qs
     qs_latest = jtu.tree_map(lambda x: x[:, -1, ...], qs)
@@ -226,6 +266,7 @@ def _run_sequence_fixed_window_step(
         empirical_prior,
         valid_steps,
         history_len,
+        action_next,
     )
     return updated_agent, action_next, qs, xtra, qs_carry, qs_latest, empirical_prior_next
 
@@ -239,6 +280,7 @@ def _run_smoothing_fixed_window_step(
     action_prev: Array,
     rng_key: Array,
     policy_search: Callable[[Agent, list[Array], Array], tuple[Array, dict[str, Array]]],
+    learning_beliefs: list[Array] | None = None,
 ) -> tuple[Agent, Array, list[Array], dict[str, Any], list[Array], list[Array]]:
     updated_agent, action_next, qs, xtra = infer_and_plan(
         agent,
@@ -249,7 +291,7 @@ def _run_smoothing_fixed_window_step(
         policy_search=policy_search,
         learning_observations=observation_hist,
         learning_actions=action_hist,
-        learning_beliefs=qs_prev,
+        learning_beliefs=qs_prev if learning_beliefs is None else learning_beliefs,
     )
     qs_carry = jtu.tree_map(_append_to_window, qs_prev, qs)
     qs_latest = jtu.tree_map(lambda x: x[:, -1, ...], qs)
@@ -347,6 +389,10 @@ def _init_windowed_carry(
         "agent": agent,
         "rng_key": rng_key,
     }
+    if history_len == 1:
+        # Learning context is separate from the (transition-free) inference
+        # window. The previous action is already held separately in "action".
+        carry["learning_qs"] = jtu.tree_map(lambda x: x[:, None, ...], agent.D)
     if is_sequence_method:
         carry["empirical_prior"] = agent.D
     return carry
@@ -407,7 +453,8 @@ def infer_and_plan(
     learning_actions : optional
         Optional learning action buffer.
     learning_beliefs : optional
-        Optional learning belief buffer for smoothing-based updates.
+        Optional previous learning-belief buffer, including inter-frame context
+        when a one-frame inference window cannot itself hold a transition.
     valid_steps : int | Array | None, optional
         Number of valid timesteps in padded fixed windows.
 
@@ -558,6 +605,7 @@ def rollout(
                     history_len,
                     keys[1],
                     policy_search,
+                    learning_beliefs=carry.get("learning_qs"),
                 )
             else:
                 updated_agent, action_next, qs, xtra, qs_carry, qs_latest = _run_smoothing_fixed_window_step(
@@ -569,6 +617,7 @@ def rollout(
                     action,
                     keys[1],
                     policy_search,
+                    learning_beliefs=carry.get("learning_qs"),
                 )
                 empirical_prior_next = None
         else:
@@ -620,6 +669,8 @@ def rollout(
                 "agent": updated_agent,
                 "rng_key": rng_key,
             }
+            if history_len == 1:
+                carry["learning_qs"] = jtu.tree_map(lambda x: x[:, None, ...], qs_latest)
             if is_sequence_method:
                 carry["empirical_prior"] = empirical_prior_next
         else:
@@ -667,6 +718,10 @@ def rollout(
 
     if initial_carry is not None:
         built_carry = {**built_carry, **initial_carry}
+        if use_windowing and history_len == 1 and "learning_qs" not in initial_carry:
+            built_carry["learning_qs"] = jtu.tree_map(
+                lambda x: x[:, -1:, ...], built_carry["qs"]
+            )
 
     initial_carry = built_carry
     
