@@ -1,0 +1,30 @@
+paper:
+  title: "pymdp: A Python library for active inference in discrete state spaces"
+  subtitle: "Journal of Open Source Software manuscript source edition"
+
+authors:
+  - name: "Conor Heins"
+  - name: "Beren Millidge"
+  - name: "Daphne Demekas"
+  - name: "Brennan Klein"
+  - name: "Karl Friston"
+  - name: "Iain D. Couzin"
+  - name: "Alexander Tschantz"
+
+publication:
+  repository_url: "https://github.com/ActiveInferenceInstitute/pymdp"
+  release_status: "unreleased"
+
+metadata:
+  language: "en"
+  license: "CC-BY-4.0"
+
+manuscript_dir: "docs/manuscript"
+
+render:
+  formats:
+    pdf: true
+    html: false
+    slides: false
+    docx: false
+    epub: false
