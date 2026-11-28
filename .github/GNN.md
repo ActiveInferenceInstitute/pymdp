@@ -5,8 +5,8 @@ specifications and validates them with the upstream GNN parser.
 
 - **Pin file:** [`.github/gnn-pin.json`](gnn-pin.json) — schema
   `gnn-importer-pin/v1`, repository
-  `ActiveInferenceInstitute/Generalized_Notation_Notation`, tag `v5.1.0`,
-  commit `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`.
+  `ActiveInferenceInstitute/Generalized_Notation_Notation`, tag `v5.2.0`,
+  commit `4a7cccce6d4d7cb483f00323ec5cdd79300f3464`.
 - **Arm:** `./gate.sh gnn` runs the shipped upstream reader,
   `python -m gnn.importers check --repo . --require-pointer`, from a
   materialized pinned parser tree, then runs `test/test_gnn_bridge.py` there.

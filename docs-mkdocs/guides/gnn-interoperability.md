@@ -7,8 +7,8 @@ Markdown specification and validates that specification with the real GNN
 parser, so a model defined in `pymdp` can be published, reviewed, and executed
 by GNN tooling without re-entering its matrices by hand.
 
-The bridge targets GNN **v5.1.0**, revision
-[`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf).
+The bridge targets GNN **v5.2.0**, revision
+[`4a7cccce6d4d7cb483f00323ec5cdd79300f3464`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/4a7cccce6d4d7cb483f00323ec5cdd79300f3464).
 
 That revision is recorded in [`.github/gnn-pin.json`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/gnn-pin.json),
 read by GNN's own importer reader (`python -m gnn.importers check --repo .`),
@@ -105,7 +105,7 @@ an existing export. The exported bytes are independent of checkout WIP:
 ```bash
 GNN_EXPORT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
 git -C /path/to/Generalized_Notation_Notation \
-  archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src |
+  archive 4a7cccce6d4d7cb483f00323ec5cdd79300f3464 src |
   tar -x -C "$GNN_EXPORT_ROOT"
 export PYMDP_GNN_ROOT="$GNN_EXPORT_ROOT/src"
 ```
@@ -121,7 +121,7 @@ export_root = tempfile.mkdtemp(prefix="pymdp-gnn-pin-")
 exported = gnn.export_pinned_source(
     "/path/to/Generalized_Notation_Notation", export_root
 )
-print(exported.revision)  # 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf
+print(exported.revision)  # 4a7cccce6d4d7cb483f00323ec5cdd79300f3464
 ```
 
 Then validate:
@@ -194,9 +194,9 @@ agreement is not evidence that the pin authenticates a temporal extension.
 
 GNN at the pinned revision:
 
-- [Framework integration guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/integration/framework_integration_guide.md)
-- [GNN syntax specification](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/gnn_syntax.md)
-- [PyMDP implementation guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf/docs/gnn/implementations/pymdp.md)
+- [Framework integration guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/4a7cccce6d4d7cb483f00323ec5cdd79300f3464/docs/gnn/integration/framework_integration_guide.md)
+- [GNN syntax specification](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/4a7cccce6d4d7cb483f00323ec5cdd79300f3464/docs/gnn/gnn_syntax.md)
+- [PyMDP implementation guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/4a7cccce6d4d7cb483f00323ec5cdd79300f3464/docs/gnn/implementations/pymdp.md)
 
 Newer than the pinned revision, on GNN `main`:
 

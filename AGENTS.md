@@ -80,8 +80,8 @@ additive and keep one canonical home per concept: joint composition for
 factorized models belongs to GNN, so multi-modality/multi-factor models are
 refused here rather than flattened by a second convention.
 
-- Pin: `.github/gnn-pin.json` records GNN v5.1.0
-  (`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`). `pymdp.gnn.GNN_PINNED_RELEASE` /
+- Pin: `.github/gnn-pin.json` records GNN v5.2.0
+  (`4a7cccce6d4d7cb483f00323ec5cdd79300f3464`). `pymdp.gnn.GNN_PINNED_RELEASE` /
   `GNN_PINNED_REVISION` mirror it for library consumers, and `./gate.sh gnn`
   requires the two to agree (`--expected-tag` / `--expected-commit`), so a bump
   changes the pin first and the constants with it.
