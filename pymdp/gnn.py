@@ -35,7 +35,7 @@ Usage
 
     # Bind validation to an exported, immutable copy of the pinned GNN tree:
     #   export_root="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
-    #   git -C <gnn-checkout> archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src | tar -x -C "$export_root"
+    #   git -C <gnn-checkout> archive 4a7cccce6d4d7cb483f00323ec5cdd79300f3464 src | tar -x -C "$export_root"
     report = gnn.validate_gnn_spec(agent, path, gnn_source_root="<export_root>/src")
     assert report.ok, report.describe()
 
@@ -97,10 +97,10 @@ __all__ = [
 #: GNN release this bridge targets. Mirrors ``.github/gnn-pin.json``: the pin is
 #: the record, this constant is the code-facing surface for library consumers,
 #: and ``./gate.sh gnn`` requires the two to agree.
-GNN_PINNED_RELEASE = "v5.1.0"
+GNN_PINNED_RELEASE = "v5.2.0"
 
-#: Commit of the pinned GNN release (the commit ``v5.1.0`` names).
-GNN_PINNED_REVISION = "75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf"
+#: Commit of the pinned GNN release (the commit ``v5.2.0`` names).
+GNN_PINNED_REVISION = "4a7cccce6d4d7cb483f00323ec5cdd79300f3464"
 
 #: Suffix for emitted specifications (self-identifying; GNN parses it as Markdown).
 GNN_SPEC_SUFFIX = ".gnn.md"

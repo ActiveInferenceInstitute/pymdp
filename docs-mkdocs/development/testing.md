@@ -107,7 +107,7 @@ Both arms default to `-n0` inside the runner to avoid xdist/nbval conflicts.
 Notation specification and validates it against the pinned GNN parser.
 
 The pin is a file, [`.github/gnn-pin.json`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/gnn-pin.json),
-which records GNN `v5.1.0` at `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`. It is
+which records GNN `v5.2.0` at `4a7cccce6d4d7cb483f00323ec5cdd79300f3464`. It is
 read by GNN's shipped reader — `python -m gnn.importers check --repo .` — not by
 a local parser, and [`.github/GNN.md`](https://github.com/ActiveInferenceInstitute/pymdp/blob/master/.github/GNN.md)
 is the pointer that reader checks. `pymdp.gnn.GNN_PINNED_RELEASE` /
@@ -119,7 +119,7 @@ PYMDP_GNN_CHECKOUT=/path/to/Generalized_Notation_Notation ./gate.sh gnn
 # or point the arm at a tree you exported yourself:
 GNN_EXPORT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/pymdp-gnn-pin.XXXXXXXX")"
 git -C /path/to/Generalized_Notation_Notation \
-  archive 75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf src |
+  archive 4a7cccce6d4d7cb483f00323ec5cdd79300f3464 src |
   tar -x -C "$GNN_EXPORT_ROOT"
 PYMDP_GNN_ROOT="$GNN_EXPORT_ROOT/src" ./gate.sh gnn
 ```

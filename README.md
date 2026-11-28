@@ -181,7 +181,7 @@ We also have (and are continuing to build) a series of notebooks that walk throu
 
 ## Publishing models as Generalized Notation Notation (GNN)
 
-`pymdp` generative models can be published as [Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation) (GNN) specifications — the plain-text language for Active Inference generative models — and validated against the real GNN parser pinned at GNN v5.1.0 (revision `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`, recorded in [`.github/gnn-pin.json`](.github/gnn-pin.json) and read by GNN's own importer reader, `python -m gnn.importers check --repo .`):
+`pymdp` generative models can be published as [Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation) (GNN) specifications — the plain-text language for Active Inference generative models — and validated against the real GNN parser pinned at GNN v5.2.0 (revision `4a7cccce6d4d7cb483f00323ec5cdd79300f3464`, recorded in [`.github/gnn-pin.json`](.github/gnn-pin.json) and read by GNN's own importer reader, `python -m gnn.importers check --repo .`):
 
 ```python
 from pymdp import gnn
