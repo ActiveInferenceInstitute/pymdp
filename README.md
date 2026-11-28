@@ -1,4 +1,3 @@
-
 <p align='center'>
   <a href='https://github.com/infer-actively/pymdp'>
     <img src='.github/pymdp_logo_2-removebg.png' />
@@ -41,6 +40,9 @@ dependencies are installed (`uv sync --group test`).
   tree (`PYMDP_GNN_ROOT`); it skips cleanly otherwise.
 
 ## Documentation
+
+The [fork documentation hub](docs/README.md) links the current library guides,
+verification instructions, and the [renderable JOSS manuscript](docs/manuscript/README.md).
 
 The published site is <https://pymdp-rtd.readthedocs.io/en/latest/>; its source
 is the [`docs-mkdocs/`](docs-mkdocs/README.md) tree.
